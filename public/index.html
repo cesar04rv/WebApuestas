@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quiniela Empresa ⚽</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="noise"></div>
+
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <span class="logo-icon">⚽</span>
+      <span class="logo-text">QUINIELA<span class="logo-sub">EMPRESA</span></span>
+    </div>
+    <button class="btn-admin-toggle" onclick="toggleAdmin()">⚙ Admin</button>
+  </div>
+</header>
+
+<main class="container">
+
+  <!-- SCOREBOARD -->
+  <section class="scoreboard" id="scoreboard">
+    <div class="scoreboard-label">PARTIDO DE LA SEMANA</div>
+    <div class="scoreboard-match" id="weekInfo">Cargando...</div>
+    <div class="scoreboard-pot" id="potInfo"></div>
+    <div class="scoreboard-status" id="weekStatus"></div>
+  </section>
+
+  <!-- TURNO ACTUAL -->
+  <section class="turn-banner" id="turnBanner">
+    <div class="turn-inner">
+      <span class="turn-label">LE TOCA</span>
+      <span class="turn-name" id="currentTurnName">—</span>
+    </div>
+    <div class="turn-form">
+      <input type="text" id="resultInput" placeholder="Ej: 2-1" maxlength="10" autocomplete="off">
+      <button class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
+    </div>
+  </section>
+
+  <!-- JUGADORES -->
+  <section class="card">
+    <div class="card-header">
+      <h2>👥 Jugadores</h2>
+      <span class="badge" id="playersCount">0</span>
+    </div>
+    <div id="playersList" class="players-grid"></div>
+  </section>
+
+  <!-- RANKINGS -->
+  <section class="card">
+    <div class="card-header">
+      <h2>🏆 Rankings</h2>
+      <div class="tab-group">
+        <button class="tab active" onclick="switchTab('wins')">Victorias</button>
+        <button class="tab" onclick="switchTab('money')">Dinero</button>
+        <button class="tab" onclick="switchTab('rate')">Precisión</button>
+      </div>
+    </div>
+    <div id="rankingsList" class="rankings-list"></div>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section class="card">
+    <div class="card-header">
+      <h2>📋 Historial</h2>
+      <button class="btn btn-sm" onclick="toggleHistory()">Ver más</button>
+    </div>
+    <div id="historyList" class="history-list hidden"></div>
+  </section>
+
+  <!-- ADMIN PANEL -->
+  <section class="card admin-panel hidden" id="adminPanel">
+    <div class="card-header">
+      <h2>⚙ Administración</h2>
+    </div>
+
+    <div class="admin-grid">
+      <div class="admin-block">
+        <h3>➕ Añadir Jugador</h3>
+        <div class="input-row">
+          <input type="text" id="newPlayerName" placeholder="Nombre del jugador">
+          <button class="btn btn-green" onclick="addPlayer()">Añadir</button>
+        </div>
+      </div>
+
+      <div class="admin-block">
+        <h3>📅 Nueva Semana</h3>
+        <div class="input-row">
+          <input type="text" id="newMatch" placeholder="Ej: Real Madrid vs Barça">
+          <button class="btn btn-blue" onclick="createWeek()">Crear</button>
+        </div>
+      </div>
+
+      <div class="admin-block">
+        <h3>🏁 Cerrar Semana</h3>
+        <div class="input-row">
+          <input type="text" id="realResult" placeholder="Resultado real (ej: 1-0)">
+          <input type="number" id="weeklyAmount" placeholder="€ por persona" min="0">
+          <button class="btn btn-red" onclick="closeWeek()">Cerrar</button>
+        </div>
+      </div>
+
+      <div class="admin-block full">
+        <h3>🔀 Reordenar Jugadores</h3>
+        <div id="reorderList" class="reorder-list"></div>
+        <button class="btn btn-green" onclick="saveOrder()">Guardar Orden</button>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script src="script.js"></script>
+</body>
+</html>
