@@ -18,7 +18,10 @@
       <span class="logo-icon">⚽</span>
       <span class="logo-text">QUINIELA<span class="logo-sub">EMPRESA</span></span>
     </div>
-    <button class="btn-admin-toggle" onclick="toggleAdmin()">⚙ Admin</button>
+    <div class="header-actions">
+      <button class="btn-admin-toggle" onclick="toggleAdmin()">⚙ Admin</button>
+      <button class="btn-logout" onclick="doLogout()">Salir</button>
+    </div>
   </div>
 </header>
 
@@ -28,6 +31,7 @@
   <section class="scoreboard" id="scoreboard">
     <div class="scoreboard-label">PARTIDO DE LA SEMANA</div>
     <div class="scoreboard-match" id="weekInfo">Cargando...</div>
+    <div class="scoreboard-datetime" id="weekDatetime"></div>
     <div class="scoreboard-pot" id="potInfo"></div>
     <div class="scoreboard-status" id="weekStatus"></div>
   </section>
@@ -58,9 +62,9 @@
     <div class="card-header">
       <h2>🏆 Rankings</h2>
       <div class="tab-group">
-        <button class="tab active" onclick="switchTab('wins')">Victorias</button>
-        <button class="tab" onclick="switchTab('money')">Dinero</button>
-        <button class="tab" onclick="switchTab('rate')">Precisión</button>
+        <button class="tab active" onclick="switchTab('wins', event)">Victorias</button>
+        <button class="tab" onclick="switchTab('money', event)">Dinero</button>
+        <button class="tab" onclick="switchTab('rate', event)">Precisión</button>
       </div>
     </div>
     <div id="rankingsList" class="rankings-list"></div>
@@ -92,19 +96,38 @@
 
       <div class="admin-block">
         <h3>📅 Nueva Semana</h3>
-        <div class="input-row">
+        <div class="input-col">
           <input type="text" id="newMatch" placeholder="Ej: Real Madrid vs Barça">
-          <button class="btn btn-blue" onclick="createWeek()">Crear</button>
+          <div class="input-row">
+            <input type="datetime-local" id="newMatchDate" title="Fecha y hora del partido (opcional)">
+          </div>
+          <button class="btn btn-blue" onclick="createWeek()">Crear Semana</button>
+        </div>
+      </div>
+
+      <div class="admin-block">
+        <h3>✏️ Editar Partido Actual</h3>
+        <div class="input-col">
+          <input type="text" id="editMatch" placeholder="Nuevo nombre del partido">
+          <input type="datetime-local" id="editMatchDate" title="Nueva fecha y hora (opcional)">
+          <div class="warn-note">⚠️ Se borrarán todas las apuestas actuales</div>
+          <button class="btn btn-amber" onclick="editWeek()">Guardar Cambios</button>
         </div>
       </div>
 
       <div class="admin-block">
         <h3>🏁 Cerrar Semana</h3>
-        <div class="input-row">
+        <div class="input-col">
           <input type="text" id="realResult" placeholder="Resultado real (ej: 1-0)">
           <input type="number" id="weeklyAmount" placeholder="€ por persona" min="0">
-          <button class="btn btn-red" onclick="closeWeek()">Cerrar</button>
+          <button class="btn btn-red" onclick="closeWeek()">Cerrar Semana</button>
         </div>
+      </div>
+
+      <div class="admin-block danger-block">
+        <h3>🗑️ Eliminar Semana Actual</h3>
+        <p class="warn-note">Elimina la semana activa y todas sus apuestas permanentemente.</p>
+        <button class="btn btn-red-outline" onclick="deleteWeek()">Eliminar Semana</button>
       </div>
 
       <div class="admin-block full">
@@ -119,6 +142,19 @@
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-icon" id="modalIcon">⚠️</div>
+    <div class="modal-title" id="modalTitle">¿Estás seguro?</div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-confirm" id="modalConfirmBtn">Confirmar</button>
+    </div>
+  </div>
+</div>
 
 <script src="script.js"></script>
 </body>
