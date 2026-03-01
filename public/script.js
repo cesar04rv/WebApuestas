@@ -190,9 +190,11 @@ function sendPrediction() {
   if (!currentWeek) return toast("No hay semana activa", "error");
   if (!currentTurnPlayer) return toast("No hay turno activo", "error");
 
-  const result = document.getElementById("resultInput").value.trim();
-  if (!result) return toast("Introduce un resultado", "error");
-  if (!/^\d+-\d+$/.test(result)) return toast("Formato: 2-1 (local-visitante)", "error");
+  const local = document.getElementById("resultLocal").value.trim();
+  const visit = document.getElementById("resultVisit").value.trim();
+  if (local === "" || visit === "") return toast("Introduce los dos goles", "error");
+
+  const result = `${local}-${visit}`;
 
   showModal({
     icon: "⚽",
@@ -210,7 +212,8 @@ function sendPrediction() {
         toast(data.error, "error");
       } else {
         toast(`✓ ${currentTurnPlayer.name} apostó ${result}`, "success");
-        document.getElementById("resultInput").value = "";
+        document.getElementById("resultLocal").value = "";
+        document.getElementById("resultVisit").value = "";
         loadData();
       }
     }
@@ -238,6 +241,7 @@ async function createWeek() {
   toast("✓ Semana creada", "success");
   document.getElementById("newMatch").value = "";
   document.getElementById("newMatchDate").value = "";
+  toggleAdmin();
   loadData();
 }
 
@@ -284,14 +288,20 @@ function deleteWeek() {
 
 async function closeWeek() {
   if (!currentWeek) return toast("No hay semana activa", "error");
-  const real_result = document.getElementById("realResult").value.trim();
+
+  const local = document.getElementById("realLocal").value.trim();
+  const visit = document.getElementById("realVisit").value.trim();
+  if (local === "" || visit === "") return toast("Introduce el resultado real", "error");
+
+  const real_result = `${local}-${visit}`;
   const weekly_amount = parseInt(document.getElementById("weeklyAmount").value) || 0;
-  if (!real_result) return toast("Introduce el resultado real", "error");
 
   const data = await post("/close-week", { week_id: currentWeek.id, real_result, weekly_amount });
   toast(data.message || "Semana cerrada", "info");
-  document.getElementById("realResult").value = "";
+  document.getElementById("realLocal").value = "";
+  document.getElementById("realVisit").value = "";
   document.getElementById("weeklyAmount").value = "";
+  toggleAdmin();
   loadData();
   if (historyVisible) loadHistory();
 }
@@ -416,9 +426,21 @@ function renderRankings() {
   });
 }
 
-// ===================== ADMIN TOGGLE =====================
+// ===================== ADMIN DRAWER =====================
 function toggleAdmin() {
-  document.getElementById("adminPanel").classList.toggle("hidden");
+  const drawer = document.getElementById("adminDrawer");
+  const overlay = document.getElementById("drawerOverlay");
+  const isOpen = drawer.classList.contains("open");
+
+  if (isOpen) {
+    drawer.classList.remove("open");
+    overlay.classList.add("hidden");
+    document.body.style.overflow = "";
+  } else {
+    drawer.classList.add("open");
+    overlay.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
 }
 
 // ===================== MODAL =====================
@@ -458,3 +480,36 @@ function toast(msg, type = "info") {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
 }
+// ===================== KEYBOARD & AUTO-JUMP =====================
+document.addEventListener("DOMContentLoaded", () => {
+  const autoJump = (fromId, toId) => {
+    const el = document.getElementById(fromId);
+    if (!el) return;
+    el.addEventListener("input", () => {
+      if (el.value.length >= 2 || (el.value !== "" && parseInt(el.value) >= 10)) {
+        document.getElementById(toId)?.focus();
+      }
+    });
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === "-") {
+        e.preventDefault();
+        document.getElementById(toId)?.focus();
+      }
+    });
+  };
+
+  autoJump("resultLocal", "resultVisit");
+  autoJump("realLocal", "realVisit");
+
+  document.getElementById("resultVisit")?.addEventListener("keydown", e => {
+    if (e.key === "Enter") sendPrediction();
+  });
+
+  // Cerrar drawer o modal con Escape
+  document.addEventListener("keydown", e => {
+    if (e.key !== "Escape") return;
+    const drawer = document.getElementById("adminDrawer");
+    if (drawer?.classList.contains("open")) toggleAdmin();
+    else closeModal();
+  });
+});

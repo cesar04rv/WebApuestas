@@ -21,8 +21,9 @@ app.use(session({
 
 // Middleware de autenticación
 app.use((req, res, next) => {
-  const openPaths = ["/api/login", "/login.html", "/login.css", "/login.js"];
+  const openPaths = ["/api/login", "/api/me", "/login.html", "/login.css", "/login.js"];
   if (openPaths.includes(req.path) || req.session.authenticated) return next();
+  if (req.path.startsWith("/api/")) return res.status(401).json({ error: "No autenticado" });
   if (req.accepts("html")) return res.redirect("/login.html");
   res.status(401).json({ error: "No autenticado" });
 });
@@ -81,6 +82,10 @@ app.post("/api/login", (req, res) => {
 app.post("/api/logout", (req, res) => {
   req.session.destroy();
   res.json({ success: true });
+});
+
+app.get("/api/me", (req, res) => {
+  res.json({ authenticated: !!req.session.authenticated });
 });
 
 // ===================== PLAYERS =====================
