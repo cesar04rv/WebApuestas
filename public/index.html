@@ -147,6 +147,23 @@
       <button class="btn btn-red-outline" onclick="deleteWeek()">Eliminar Semana</button>
     </div>
 
+    <div class="drawer-section backup-section">
+      <h3>💾 Copia de Seguridad</h3>
+      <div class="input-col">
+        <button class="btn btn-backup" onclick="exportData()">⬇️ Descargar copia (JSON)</button>
+        <label class="btn btn-backup" style="text-align:center;cursor:pointer;">
+          ⬆️ Restaurar desde JSON
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        </label>
+      </div>
+    </div>
+
+    <div class="drawer-section danger-section">
+      <h3>☢️ Borrar Todos los Datos</h3>
+      <p class="warn-note">Elimina jugadores, semanas y apuestas. Acción irreversible.</p>
+      <button class="btn btn-red-outline" onclick="resetAll()">Borrar todo</button>
+    </div>
+
   </div>
 </aside>
 

@@ -294,7 +294,8 @@ async function closeWeek() {
   if (local === "" || visit === "") return toast("Introduce el resultado real", "error");
 
   const real_result = `${local}-${visit}`;
-  const weekly_amount = parseInt(document.getElementById("weeklyAmount").value) || 0;
+  const weeklyRaw = document.getElementById("weeklyAmount").value;
+  const weekly_amount = weeklyRaw === "" ? null : parseInt(weeklyRaw);
 
   const data = await post("/close-week", { week_id: currentWeek.id, real_result, weekly_amount });
   toast(data.message || "Semana cerrada", "info");
@@ -470,6 +471,68 @@ document.getElementById("modalConfirmBtn").addEventListener("click", () => {
 document.getElementById("modalOverlay").addEventListener("click", (e) => {
   if (e.target === e.currentTarget) closeModal();
 });
+
+// ===================== BACKUP / RESTORE / RESET =====================
+
+function exportData() {
+  window.location.href = "/api/export";
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    let data;
+    try {
+      data = JSON.parse(e.target.result);
+    } catch {
+      return toast("Archivo JSON inválido", "error");
+    }
+
+    showModal({
+      icon: "⬆️",
+      title: "¿Restaurar datos?",
+      body: `Se importarán <strong>${data.players?.length || 0} jugadores</strong>, <strong>${data.weeks?.length || 0} semanas</strong> y <strong>${data.predictions?.length || 0} apuestas</strong>.<br><br>⚠️ Los datos actuales se reemplazarán completamente.`,
+      confirmText: "Sí, restaurar",
+      danger: true,
+      onConfirm: async () => {
+        const res = await post("/api/import", data);
+        if (res.error) {
+          toast(res.error, "error");
+        } else {
+          toast(`✓ ${res.message}`, "success");
+          toggleAdmin();
+          loadData();
+        }
+        // Reset file input so same file can be selected again
+        document.getElementById("importFile").value = "";
+      }
+    });
+  };
+  reader.readAsText(file);
+}
+
+function resetAll() {
+  showModal({
+    icon: "☢️",
+    title: "¿Borrar todo?",
+    body: "Se eliminarán <strong>todos los jugadores, semanas y apuestas</strong> de la base de datos.<br><br>Esta acción es <strong>irreversible</strong>. Descarga una copia antes si no quieres perder los datos.",
+    confirmText: "Borrar todo",
+    danger: true,
+    onConfirm: async () => {
+      const res = await post("/api/reset", {});
+      if (res.error) {
+        toast(res.error, "error");
+      } else {
+        toast("Base de datos limpiada", "info");
+        toggleAdmin();
+        loadData();
+      }
+    }
+  });
+}
 
 // ===================== TOAST =====================
 let toastTimer;

@@ -625,6 +625,25 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
 .btn-red-outline { background: transparent; border: 1px solid rgba(244,67,54,0.4); color: var(--red); width: 100%; }
 .btn-red-outline:hover { background: rgba(244,67,54,0.1); border-color: var(--red); }
 
+.backup-section { background: rgba(33,150,243,0.04); border-top: 1px solid rgba(33,150,243,0.15) !important; }
+
+.btn-backup {
+  background: transparent;
+  border: 1px solid rgba(33,150,243,0.4);
+  color: var(--blue);
+  width: 100%;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: block;
+}
+.btn-backup:hover { background: rgba(33,150,243,0.1); border-color: var(--blue); }
+
 .btn-sm {
   background: var(--bg-card2);
   border: 1px solid var(--border);
