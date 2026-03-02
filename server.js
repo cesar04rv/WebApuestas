@@ -202,12 +202,16 @@ app.post("/close-week", (req, res) => {
   const { week_id, real_result, weekly_amount } = req.body;
   if (!week_id || !real_result) return res.status(400).json({ message: "Faltan datos" });
 
+  const amountPerPerson = (weekly_amount !== undefined && weekly_amount !== "" && weekly_amount !== null && !isNaN(parseInt(weekly_amount)))
+    ? parseInt(weekly_amount)
+    : 1;
+
   db.get("SELECT * FROM weeks WHERE id = ?", [week_id], (err, week) => {
     if (!week) return res.status(404).json({ message: "Semana no encontrada" });
 
     db.get("SELECT COUNT(*) as count FROM players", (err, row) => {
       const totalPlayers = row.count;
-      const contribution = (parseInt(weekly_amount) || 0) * totalPlayers;
+      const contribution = amountPerPerson * totalPlayers;
       const newPot = (week.pot || 0) + contribution;
 
       db.all("SELECT * FROM predictions WHERE week_id = ?", [week_id], (err, predictions) => {
@@ -217,11 +221,11 @@ app.post("/close-week", (req, res) => {
 
         db.run(
           "UPDATE weeks SET real_result = ?, weekly_amount = ?, pot = ?, next_pot = ?, finished = 1 WHERE id = ?",
-          [real_result.trim(), parseInt(weekly_amount) || 0, newPot, nextPot, week_id],
+          [real_result.trim(), amountPerPerson, newPot, nextPot, week_id],
           (err) => {
             if (err) return res.status(500).json({ message: err.message });
 
-            // Siempre rotación de 1: el primero pasa al último, da igual si acierta o no
+            // Siempre rotación de 1: el primero pasa al último
             db.all("SELECT * FROM players ORDER BY order_position ASC", (err, allPlayers) => {
               const newOrder = [...allPlayers.slice(1), allPlayers[0]];
               db.serialize(() => newOrder.forEach((p, i) => db.run("UPDATE players SET order_position = ? WHERE id = ?", [i + 1, p.id])));
@@ -270,6 +274,64 @@ app.get("/rankings", (req, res) => {
   `, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows || []);
+  });
+});
+
+// ===================== BACKUP / RESTORE / RESET =====================
+
+app.get("/api/export", (req, res) => {
+  db.all("SELECT * FROM players ORDER BY order_position ASC", (err, players) => {
+    if (err) return res.status(500).json({ error: err.message });
+    db.all("SELECT * FROM weeks ORDER BY id ASC", (err, weeks) => {
+      if (err) return res.status(500).json({ error: err.message });
+      db.all("SELECT * FROM predictions ORDER BY id ASC", (err, predictions) => {
+        if (err) return res.status(500).json({ error: err.message });
+        const backup = { exported_at: new Date().toISOString(), version: 1, players, weeks, predictions };
+        const filename = `porrids_backup_${new Date().toISOString().slice(0,10)}.json`;
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        res.setHeader("Content-Type", "application/json");
+        res.json(backup);
+      });
+    });
+  });
+});
+
+app.post("/api/import", (req, res) => {
+  const { players, weeks, predictions } = req.body;
+  if (!players || !weeks || !predictions) {
+    return res.status(400).json({ error: "JSON inválido: faltan datos" });
+  }
+
+  db.serialize(() => {
+    db.run("DELETE FROM predictions");
+    db.run("DELETE FROM weeks");
+    db.run("DELETE FROM players");
+    db.run("DELETE FROM sqlite_sequence WHERE name IN ('players','weeks','predictions')", () => {});
+
+    const stmtP = db.prepare("INSERT INTO players (id, name, order_position) VALUES (?, ?, ?)");
+    players.forEach(p => stmtP.run(p.id, p.name, p.order_position));
+    stmtP.finalize();
+
+    const stmtW = db.prepare("INSERT INTO weeks (id, match, match_date, created_at, real_result, pot, next_pot, weekly_amount, finished) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    weeks.forEach(w => stmtW.run(w.id, w.match, w.match_date || null, w.created_at || null, w.real_result || null, w.pot || 0, w.next_pot || 0, w.weekly_amount || 0, w.finished || 0));
+    stmtW.finalize();
+
+    const stmtPr = db.prepare("INSERT INTO predictions (id, week_id, player_id, result) VALUES (?, ?, ?, ?)");
+    predictions.forEach(p => stmtPr.run(p.id, p.week_id, p.player_id, p.result));
+    stmtPr.finalize(() => {
+      res.json({ success: true, message: `Importados: ${players.length} jugadores, ${weeks.length} semanas, ${predictions.length} apuestas` });
+    });
+  });
+});
+
+app.post("/api/reset", (req, res) => {
+  db.serialize(() => {
+    db.run("DELETE FROM predictions");
+    db.run("DELETE FROM weeks");
+    db.run("DELETE FROM players");
+    db.run("DELETE FROM sqlite_sequence WHERE name IN ('players','weeks','predictions')", () => {
+      res.json({ success: true });
+    });
   });
 });
 
