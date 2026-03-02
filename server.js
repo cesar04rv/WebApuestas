@@ -202,17 +202,12 @@ app.post("/close-week", (req, res) => {
   const { week_id, real_result, weekly_amount } = req.body;
   if (!week_id || !real_result) return res.status(400).json({ message: "Faltan datos" });
 
-  // Por defecto 1€ por persona si no se especifica o se deja vacío
-  const amountPerPerson = (weekly_amount !== undefined && weekly_amount !== "" && weekly_amount !== null && !isNaN(parseInt(weekly_amount)))
-    ? parseInt(weekly_amount)
-    : 1;
-
   db.get("SELECT * FROM weeks WHERE id = ?", [week_id], (err, week) => {
     if (!week) return res.status(404).json({ message: "Semana no encontrada" });
 
     db.get("SELECT COUNT(*) as count FROM players", (err, row) => {
       const totalPlayers = row.count;
-      const contribution = amountPerPerson * totalPlayers;
+      const contribution = (parseInt(weekly_amount) || 0) * totalPlayers;
       const newPot = (week.pot || 0) + contribution;
 
       db.all("SELECT * FROM predictions WHERE week_id = ?", [week_id], (err, predictions) => {
@@ -222,36 +217,22 @@ app.post("/close-week", (req, res) => {
 
         db.run(
           "UPDATE weeks SET real_result = ?, weekly_amount = ?, pot = ?, next_pot = ?, finished = 1 WHERE id = ?",
-          [real_result.trim(), amountPerPerson, newPot, nextPot, week_id],
+          [real_result.trim(), parseInt(weekly_amount) || 0, newPot, nextPot, week_id],
           (err) => {
             if (err) return res.status(500).json({ message: err.message });
 
-            if (hasWinner && winners.length === 1) {
-              // Un solo ganador: se coloca último, los demás rotan hacia arriba
-              db.all("SELECT * FROM players ORDER BY order_position ASC", (err, allPlayers) => {
-                const winnerId = winners[0].player_id;
-                const nonWinners = allPlayers.filter(p => p.id !== winnerId);
-                const winnerPlayer = allPlayers.find(p => p.id === winnerId);
-                const newOrder = [...nonWinners, winnerPlayer];
-                db.serialize(() => newOrder.forEach((p, i) => db.run("UPDATE players SET order_position = ? WHERE id = ?", [i + 1, p.id])));
-                const winnerName = winnerPlayer?.name || "?";
-                res.json({ message: `✅ Semana cerrada. Acertó: ${winnerName}. Bote: ${newPot}€`, winners: winnerName, pot: newPot });
-              });
-            } else {
-              // Nadie acierta O 2+ ganadores: el primero pasa al último (rotación cíclica)
-              db.all("SELECT * FROM players ORDER BY order_position ASC", (err, allPlayers) => {
-                const first = allPlayers[0];
-                const rest = allPlayers.slice(1);
-                const newOrder = [...rest, first];
-                db.serialize(() => newOrder.forEach((p, i) => db.run("UPDATE players SET order_position = ? WHERE id = ?", [i + 1, p.id])));
-                if (hasWinner) {
-                  const winnerNames = winners.map(w => allPlayers.find(p => p.id === w.player_id)?.name || "?").join(", ");
-                  res.json({ message: `✅ Semana cerrada. Acertaron: ${winnerNames}. Bote: ${newPot}€`, winners: winnerNames, pot: newPot });
-                } else {
-                  res.json({ message: `❌ Nadie acertó. El bote sube a ${newPot}€`, winners: null, pot: newPot });
-                }
-              });
-            }
+            // Siempre rotación de 1: el primero pasa al último, da igual si acierta o no
+            db.all("SELECT * FROM players ORDER BY order_position ASC", (err, allPlayers) => {
+              const newOrder = [...allPlayers.slice(1), allPlayers[0]];
+              db.serialize(() => newOrder.forEach((p, i) => db.run("UPDATE players SET order_position = ? WHERE id = ?", [i + 1, p.id])));
+
+              if (hasWinner) {
+                const winnerNames = winners.map(w => allPlayers.find(p => p.id === w.player_id)?.name || "?").join(", ");
+                res.json({ message: `✅ Semana cerrada. Acertaron: ${winnerNames}. Bote: ${newPot}€`, winners: winnerNames, pot: newPot });
+              } else {
+                res.json({ message: `❌ Nadie acertó. El bote sube a ${newPot}€`, winners: null, pot: newPot });
+              }
+            });
           }
         );
       });
@@ -289,85 +270,6 @@ app.get("/rankings", (req, res) => {
   `, (err, rows) => {
     if (err) return res.status(500).json({ error: err.message });
     res.json(rows || []);
-  });
-});
-
-// ===================== BACKUP / RESTORE / RESET =====================
-
-// Exportar todos los datos como JSON
-app.get("/api/export", (req, res) => {
-  db.all("SELECT * FROM players ORDER BY order_position ASC", (err, players) => {
-    if (err) return res.status(500).json({ error: err.message });
-    db.all("SELECT * FROM weeks ORDER BY id ASC", (err, weeks) => {
-      if (err) return res.status(500).json({ error: err.message });
-      db.all("SELECT * FROM predictions ORDER BY id ASC", (err, predictions) => {
-        if (err) return res.status(500).json({ error: err.message });
-
-        const backup = {
-          exported_at: new Date().toISOString(),
-          version: 1,
-          players,
-          weeks,
-          predictions
-        };
-
-        const filename = `porrids_backup_${new Date().toISOString().slice(0,10)}.json`;
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-        res.setHeader("Content-Type", "application/json");
-        res.json(backup);
-      });
-    });
-  });
-});
-
-// Importar datos desde JSON (añade encima de los datos existentes — hace reset primero)
-app.post("/api/import", (req, res) => {
-  const { players, weeks, predictions, version } = req.body;
-
-  if (!players || !weeks || !predictions) {
-    return res.status(400).json({ error: "JSON inválido: faltan datos" });
-  }
-
-  db.serialize(() => {
-    // Limpiar tablas
-    db.run("DELETE FROM predictions");
-    db.run("DELETE FROM weeks");
-    db.run("DELETE FROM players");
-    db.run("DELETE FROM sqlite_sequence WHERE name IN ('players','weeks','predictions')", () => {});
-
-    // Restaurar players
-    const stmtP = db.prepare("INSERT INTO players (id, name, order_position) VALUES (?, ?, ?)");
-    players.forEach(p => stmtP.run(p.id, p.name, p.order_position));
-    stmtP.finalize();
-
-    // Restaurar weeks
-    const stmtW = db.prepare("INSERT INTO weeks (id, match, match_date, created_at, real_result, pot, next_pot, weekly_amount, finished) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    weeks.forEach(w => stmtW.run(w.id, w.match, w.match_date || null, w.created_at || null, w.real_result || null, w.pot || 0, w.next_pot || 0, w.weekly_amount || 0, w.finished || 0));
-    stmtW.finalize();
-
-    // Restaurar predictions
-    const stmtPr = db.prepare("INSERT INTO predictions (id, week_id, player_id, result) VALUES (?, ?, ?, ?)");
-    predictions.forEach(p => stmtPr.run(p.id, p.week_id, p.player_id, p.result));
-    stmtPr.finalize(() => {
-      res.json({ success: true, message: `Importados: ${players.length} jugadores, ${weeks.length} semanas, ${predictions.length} apuestas` });
-    });
-  });
-});
-
-// Borrar todos los datos
-app.post("/api/reset", (req, res) => {
-  db.serialize(() => {
-    db.run("DELETE FROM predictions");
-    db.run("DELETE FROM weeks");
-    db.run("DELETE FROM players");
-    db.run("DELETE FROM sqlite_sequence WHERE name IN ('players','weeks','predictions')", (err) => {
-      if (err) {
-        // sqlite_sequence puede no existir si no se ha insertado nada aún
-        res.json({ success: true });
-      } else {
-        res.json({ success: true });
-      }
-    });
   });
 });
 
