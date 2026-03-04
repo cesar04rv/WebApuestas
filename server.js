@@ -1,22 +1,28 @@
+require("dotenv").config();
+
 const express = require("express");
-const sqlite3 = require("sqlite3").verbose();
+const { Pool } = require("pg");
 const bodyParser = require("body-parser");
 const session = require("express-session");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // ===================== CONFIG =====================
-// ⚠️ Cambia estas credenciales antes de desplegar
-const ADMIN_USER = "admin";
-const ADMIN_PASS = "quiniela2025";
+const ADMIN_USER = process.env.ADMIN_USER || "admin";
+const ADMIN_PASS = process.env.ADMIN_PASS || "quiniela2025";
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 app.use(bodyParser.json());
 app.use(session({
-  secret: "quiniela-secret-key-2025",
+  secret: process.env.SESSION_SECRET || "quiniela-secret-key-2025",
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 8 * 60 * 60 * 1000 } // sesión de 8 horas
+  cookie: { maxAge: 8 * 60 * 60 * 1000 }
 }));
 
 // Middleware de autenticación
@@ -30,43 +36,40 @@ app.use((req, res, next) => {
 
 app.use(express.static("public"));
 
-// ===================== DB =====================
-const db = new sqlite3.Database("./database.db");
-
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS players (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE,
-    order_position INTEGER
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS weeks (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    match TEXT,
-    match_date TEXT,
-    created_at TEXT DEFAULT (datetime('now','localtime')),
-    real_result TEXT,
-    pot INTEGER DEFAULT 0,
-    next_pot INTEGER DEFAULT 0,
-    weekly_amount INTEGER DEFAULT 0,
-    finished INTEGER DEFAULT 0
-  )`);
-
-  db.run(`CREATE TABLE IF NOT EXISTS predictions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    week_id INTEGER,
-    player_id INTEGER,
-    result TEXT,
-    UNIQUE(week_id, result),
-    UNIQUE(week_id, player_id)
-  )`);
-
-  // Migraciones para BD existentes
-  ["weekly_amount", "next_pot", "match_date", "created_at"].forEach(col => {
-    const def = col === "created_at" ? "TEXT" : col.includes("amount") || col.includes("pot") ? "INTEGER DEFAULT 0" : "TEXT";
-    db.run(`ALTER TABLE weeks ADD COLUMN ${col} ${def}`, () => {});
-  });
-});
+// ===================== DB INIT =====================
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS players (
+      id SERIAL PRIMARY KEY,
+      name TEXT UNIQUE NOT NULL,
+      order_position INTEGER
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS weeks (
+      id SERIAL PRIMARY KEY,
+      match TEXT,
+      match_date TEXT,
+      created_at TEXT,
+      real_result TEXT,
+      pot INTEGER DEFAULT 0,
+      next_pot INTEGER DEFAULT 0,
+      weekly_amount INTEGER DEFAULT 0,
+      finished INTEGER DEFAULT 0
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS predictions (
+      id SERIAL PRIMARY KEY,
+      week_id INTEGER,
+      player_id INTEGER,
+      result TEXT,
+      UNIQUE(week_id, result),
+      UNIQUE(week_id, player_id)
+    )
+  `);
+  console.log("✅ Base de datos lista");
+}
 
 // ===================== AUTH =====================
 app.post("/api/login", (req, res) => {
@@ -89,254 +92,260 @@ app.get("/api/me", (req, res) => {
 });
 
 // ===================== PLAYERS =====================
-app.post("/add-player", (req, res) => {
+app.post("/add-player", async (req, res) => {
   const { name } = req.body;
   if (!name?.trim()) return res.status(400).json({ error: "Nombre inválido" });
-
-  db.get("SELECT COUNT(*) as count FROM players", (err, row) => {
-    const position = (row?.count || 0) + 1;
-    db.run("INSERT INTO players (name, order_position) VALUES (?, ?)", [name.trim(), position], (err) => {
-      if (err) return res.status(400).json({ error: "Jugador ya existe" });
-      res.json({ success: true });
-    });
-  });
-});
-
-app.get("/players", (req, res) => {
-  db.all("SELECT * FROM players ORDER BY order_position ASC", (err, rows) => res.json(rows || []));
-});
-
-app.post("/reorder-players", (req, res) => {
-  const { orders } = req.body;
-  const stmt = db.prepare("UPDATE players SET order_position = ? WHERE id = ?");
-  db.serialize(() => {
-    orders.forEach(p => stmt.run(p.order_position, p.id));
-    stmt.finalize();
+  try {
+    const { rows } = await pool.query("SELECT COUNT(*) as count FROM players");
+    const position = parseInt(rows[0].count) + 1;
+    await pool.query("INSERT INTO players (name, order_position) VALUES ($1, $2)", [name.trim(), position]);
     res.json({ success: true });
-  });
+  } catch {
+    res.status(400).json({ error: "Jugador ya existe" });
+  }
+});
+
+app.get("/players", async (req, res) => {
+  const { rows } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
+  res.json(rows);
+});
+
+app.post("/reorder-players", async (req, res) => {
+  const { orders } = req.body;
+  try {
+    for (const p of orders) {
+      await pool.query("UPDATE players SET order_position = $1 WHERE id = $2", [p.order_position, p.id]);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ===================== WEEKS =====================
-app.post("/new-week", (req, res) => {
+app.post("/new-week", async (req, res) => {
   const { match, match_date } = req.body;
   if (!match?.trim()) return res.status(400).json({ error: "Partido inválido" });
-
-  db.get("SELECT next_pot FROM weeks WHERE finished = 1 ORDER BY id DESC LIMIT 1", (err, last) => {
-    const pot = last?.next_pot || 0;
+  try {
+    const { rows } = await pool.query("SELECT next_pot FROM weeks WHERE finished = 1 ORDER BY id DESC LIMIT 1");
+    const pot = rows[0]?.next_pot || 0;
     const now = new Date().toLocaleString("es-ES", { timeZone: "Europe/Madrid" });
-
-    db.run(
-      "INSERT INTO weeks (match, match_date, created_at, pot, finished) VALUES (?, ?, ?, ?, 0)",
-      [match.trim(), match_date || null, now, pot],
-      (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
-      }
+    await pool.query(
+      "INSERT INTO weeks (match, match_date, created_at, pot, finished) VALUES ($1, $2, $3, $4, 0)",
+      [match.trim(), match_date || null, now, pot]
     );
-  });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get("/current-week", (req, res) => {
-  db.get("SELECT * FROM weeks WHERE finished = 0 ORDER BY id DESC LIMIT 1", (err, row) => res.json(row || null));
+app.get("/current-week", async (req, res) => {
+  const { rows } = await pool.query("SELECT * FROM weeks WHERE finished = 0 ORDER BY id DESC LIMIT 1");
+  res.json(rows[0] || null);
 });
 
-app.post("/edit-week", (req, res) => {
+app.post("/edit-week", async (req, res) => {
   const { week_id, match, match_date } = req.body;
   if (!week_id || !match?.trim()) return res.status(400).json({ error: "Datos inválidos" });
-
-  db.run(
-    "UPDATE weeks SET match = ?, match_date = ? WHERE id = ? AND finished = 0",
-    [match.trim(), match_date || null, week_id],
-    function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      if (this.changes === 0) return res.status(404).json({ error: "Semana no encontrada o ya cerrada" });
-
-      db.run("DELETE FROM predictions WHERE week_id = ?", [week_id], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
-      });
-    }
-  );
+  try {
+    const { rowCount } = await pool.query(
+      "UPDATE weeks SET match = $1, match_date = $2 WHERE id = $3 AND finished = 0",
+      [match.trim(), match_date || null, week_id]
+    );
+    if (rowCount === 0) return res.status(404).json({ error: "Semana no encontrada o ya cerrada" });
+    await pool.query("DELETE FROM predictions WHERE week_id = $1", [week_id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post("/delete-week", (req, res) => {
+app.post("/delete-week", async (req, res) => {
   const { week_id } = req.body;
   if (!week_id) return res.status(400).json({ error: "ID requerido" });
-
-  db.run("DELETE FROM predictions WHERE week_id = ?", [week_id], (err) => {
-    if (err) return res.status(500).json({ error: err.message });
-    db.run("DELETE FROM weeks WHERE id = ? AND finished = 0", [week_id], function(err) {
-      if (err) return res.status(500).json({ error: err.message });
-      if (this.changes === 0) return res.status(404).json({ error: "Semana no encontrada o ya cerrada" });
-      res.json({ success: true });
-    });
-  });
+  try {
+    await pool.query("DELETE FROM predictions WHERE week_id = $1", [week_id]);
+    const { rowCount } = await pool.query("DELETE FROM weeks WHERE id = $1 AND finished = 0", [week_id]);
+    if (rowCount === 0) return res.status(404).json({ error: "Semana no encontrada o ya cerrada" });
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ===================== PREDICTIONS =====================
-app.get("/predictions/:week_id", (req, res) => {
-  db.all("SELECT * FROM predictions WHERE week_id = ?", [req.params.week_id], (err, rows) => res.json(rows || []));
+app.get("/predictions/:week_id", async (req, res) => {
+  const { rows } = await pool.query("SELECT * FROM predictions WHERE week_id = $1", [req.params.week_id]);
+  res.json(rows);
 });
 
-app.post("/predict", (req, res) => {
+app.post("/predict", async (req, res) => {
   const { week_id, player_id, result } = req.body;
   if (!week_id || !player_id || !result) return res.status(400).json({ error: "Datos incompletos" });
-
-  db.all("SELECT * FROM players ORDER BY order_position ASC", (err, players) => {
-    if (!players?.length) return res.status(400).json({ error: "No hay jugadores creados" });
-
-    db.all("SELECT * FROM predictions WHERE week_id = ? ORDER BY id ASC", [week_id], (err, predictions) => {
-      const expectedPlayer = players[predictions.length % players.length].id;
-      if (parseInt(player_id) !== expectedPlayer) return res.status(400).json({ error: "No es tu turno" });
-
-      db.run("INSERT INTO predictions (week_id, player_id, result) VALUES (?, ?, ?)", [week_id, player_id, result.trim()], (err) => {
-        if (err) return res.status(400).json({ error: "Resultado ya elegido o jugador ya apostó" });
-        res.json({ success: true });
-      });
-    });
-  });
+  try {
+    const { rows: players } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
+    if (!players.length) return res.status(400).json({ error: "No hay jugadores creados" });
+    const { rows: preds } = await pool.query("SELECT * FROM predictions WHERE week_id = $1 ORDER BY id ASC", [week_id]);
+    const expectedPlayer = players[preds.length % players.length].id;
+    if (parseInt(player_id) !== expectedPlayer) return res.status(400).json({ error: "No es tu turno" });
+    await pool.query("INSERT INTO predictions (week_id, player_id, result) VALUES ($1, $2, $3)", [week_id, player_id, result.trim()]);
+    res.json({ success: true });
+  } catch {
+    res.status(400).json({ error: "Resultado ya elegido o jugador ya apostó" });
+  }
 });
 
 // ===================== CLOSE WEEK =====================
-app.post("/close-week", (req, res) => {
+app.post("/close-week", async (req, res) => {
   const { week_id, real_result, weekly_amount } = req.body;
   if (!week_id || !real_result) return res.status(400).json({ message: "Faltan datos" });
 
   const amountPerPerson = (weekly_amount !== undefined && weekly_amount !== "" && weekly_amount !== null && !isNaN(parseInt(weekly_amount)))
-    ? parseInt(weekly_amount)
-    : 1;
+    ? parseInt(weekly_amount) : 1;
 
-  db.get("SELECT * FROM weeks WHERE id = ?", [week_id], (err, week) => {
-    if (!week) return res.status(404).json({ message: "Semana no encontrada" });
+  try {
+    const { rows: weekRows } = await pool.query("SELECT * FROM weeks WHERE id = $1", [week_id]);
+    if (!weekRows.length) return res.status(404).json({ message: "Semana no encontrada" });
+    const week = weekRows[0];
 
-    db.get("SELECT COUNT(*) as count FROM players", (err, row) => {
-      const totalPlayers = row.count;
-      const contribution = amountPerPerson * totalPlayers;
-      const newPot = (week.pot || 0) + contribution;
+    const { rows: countRows } = await pool.query("SELECT COUNT(*) as count FROM players");
+    const totalPlayers = parseInt(countRows[0].count);
+    const newPot = (week.pot || 0) + amountPerPerson * totalPlayers;
 
-      db.all("SELECT * FROM predictions WHERE week_id = ?", [week_id], (err, predictions) => {
-        const winners = predictions.filter(p => p.result === real_result.trim());
-        const hasWinner = winners.length > 0;
-        const nextPot = hasWinner ? 0 : newPot;
+    const { rows: preds } = await pool.query("SELECT * FROM predictions WHERE week_id = $1", [week_id]);
+    const winners = preds.filter(p => p.result === real_result.trim());
+    const hasWinner = winners.length > 0;
+    const nextPot = hasWinner ? 0 : newPot;
 
-        db.run(
-          "UPDATE weeks SET real_result = ?, weekly_amount = ?, pot = ?, next_pot = ?, finished = 1 WHERE id = ?",
-          [real_result.trim(), amountPerPerson, newPot, nextPot, week_id],
-          (err) => {
-            if (err) return res.status(500).json({ message: err.message });
+    await pool.query(
+      "UPDATE weeks SET real_result = $1, weekly_amount = $2, pot = $3, next_pot = $4, finished = 1 WHERE id = $5",
+      [real_result.trim(), amountPerPerson, newPot, nextPot, week_id]
+    );
 
-            // Siempre rotación de 1: el primero pasa al último
-            db.all("SELECT * FROM players ORDER BY order_position ASC", (err, allPlayers) => {
-              const newOrder = [...allPlayers.slice(1), allPlayers[0]];
-              db.serialize(() => newOrder.forEach((p, i) => db.run("UPDATE players SET order_position = ? WHERE id = ?", [i + 1, p.id])));
+    // Rotación: el primero pasa al último
+    const { rows: allPlayers } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
+    const newOrder = [...allPlayers.slice(1), allPlayers[0]];
+    for (let i = 0; i < newOrder.length; i++) {
+      await pool.query("UPDATE players SET order_position = $1 WHERE id = $2", [i + 1, newOrder[i].id]);
+    }
 
-              if (hasWinner) {
-                const winnerNames = winners.map(w => allPlayers.find(p => p.id === w.player_id)?.name || "?").join(", ");
-                res.json({ message: `✅ Semana cerrada. Acertaron: ${winnerNames}. Bote: ${newPot}€`, winners: winnerNames, pot: newPot });
-              } else {
-                res.json({ message: `❌ Nadie acertó. El bote sube a ${newPot}€`, winners: null, pot: newPot });
-              }
-            });
-          }
-        );
-      });
-    });
-  });
+    if (hasWinner) {
+      const winnerNames = winners.map(w => allPlayers.find(p => p.id === w.player_id)?.name || "?").join(", ");
+      res.json({ message: `✅ Semana cerrada. Acertaron: ${winnerNames}. Bote: ${newPot}€`, winners: winnerNames, pot: newPot });
+    } else {
+      res.json({ message: `❌ Nadie acertó. El bote sube a ${newPot}€`, winners: null, pot: newPot });
+    }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // ===================== HISTORY =====================
-app.get("/history", (req, res) => {
-  db.all(`
-    SELECT w.*, GROUP_CONCAT(p.name) as winners
-    FROM weeks w
-    LEFT JOIN predictions pr ON pr.week_id = w.id AND pr.result = w.real_result
-    LEFT JOIN players p ON p.id = pr.player_id
-    WHERE w.finished = 1
-    GROUP BY w.id
-    ORDER BY w.id DESC LIMIT 30
-  `, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows || []);
-  });
+app.get("/history", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT w.*, STRING_AGG(p.name, ',') as winners
+      FROM weeks w
+      LEFT JOIN predictions pr ON pr.week_id = w.id AND pr.result = w.real_result
+      LEFT JOIN players p ON p.id = pr.player_id
+      WHERE w.finished = 1
+      GROUP BY w.id
+      ORDER BY w.id DESC LIMIT 30
+    `);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ===================== RANKINGS =====================
-app.get("/rankings", (req, res) => {
-  db.all(`
-    SELECT p.id, p.name,
-      COUNT(pr.id) as total_predictions,
-      SUM(CASE WHEN pr.result = w.real_result AND w.finished = 1 THEN 1 ELSE 0 END) as wins,
-      SUM(CASE WHEN pr.result = w.real_result AND w.finished = 1 THEN w.pot ELSE 0 END) as money_won
-    FROM players p
-    LEFT JOIN predictions pr ON pr.player_id = p.id
-    LEFT JOIN weeks w ON w.id = pr.week_id
-    GROUP BY p.id ORDER BY wins DESC, money_won DESC
-  `, (err, rows) => {
-    if (err) return res.status(500).json({ error: err.message });
-    res.json(rows || []);
-  });
+app.get("/rankings", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT p.id, p.name,
+        COUNT(pr.id) as total_predictions,
+        SUM(CASE WHEN pr.result = w.real_result AND w.finished = 1 THEN 1 ELSE 0 END) as wins,
+        SUM(CASE WHEN pr.result = w.real_result AND w.finished = 1 THEN w.pot ELSE 0 END) as money_won
+      FROM players p
+      LEFT JOIN predictions pr ON pr.player_id = p.id
+      LEFT JOIN weeks w ON w.id = pr.week_id
+      GROUP BY p.id ORDER BY wins DESC, money_won DESC
+    `);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ===================== BACKUP / RESTORE / RESET =====================
-
-app.get("/api/export", (req, res) => {
-  db.all("SELECT * FROM players ORDER BY order_position ASC", (err, players) => {
-    if (err) return res.status(500).json({ error: err.message });
-    db.all("SELECT * FROM weeks ORDER BY id ASC", (err, weeks) => {
-      if (err) return res.status(500).json({ error: err.message });
-      db.all("SELECT * FROM predictions ORDER BY id ASC", (err, predictions) => {
-        if (err) return res.status(500).json({ error: err.message });
-        const backup = { exported_at: new Date().toISOString(), version: 1, players, weeks, predictions };
-        const filename = `porrids_backup_${new Date().toISOString().slice(0,10)}.json`;
-        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-        res.setHeader("Content-Type", "application/json");
-        res.json(backup);
-      });
-    });
-  });
-});
-
-app.post("/api/import", (req, res) => {
-  const { players, weeks, predictions } = req.body;
-  if (!players || !weeks || !predictions) {
-    return res.status(400).json({ error: "JSON inválido: faltan datos" });
+app.get("/api/export", async (req, res) => {
+  try {
+    const { rows: players } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
+    const { rows: weeks } = await pool.query("SELECT * FROM weeks ORDER BY id ASC");
+    const { rows: predictions } = await pool.query("SELECT * FROM predictions ORDER BY id ASC");
+    const backup = { exported_at: new Date().toISOString(), version: 1, players, weeks, predictions };
+    const filename = `porrids_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/json");
+    res.json(backup);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  db.serialize(() => {
-    db.run("DELETE FROM predictions");
-    db.run("DELETE FROM weeks");
-    db.run("DELETE FROM players");
-    db.run("DELETE FROM sqlite_sequence WHERE name IN ('players','weeks','predictions')", () => {});
-
-    const stmtP = db.prepare("INSERT INTO players (id, name, order_position) VALUES (?, ?, ?)");
-    players.forEach(p => stmtP.run(p.id, p.name, p.order_position));
-    stmtP.finalize();
-
-    const stmtW = db.prepare("INSERT INTO weeks (id, match, match_date, created_at, real_result, pot, next_pot, weekly_amount, finished) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-    weeks.forEach(w => stmtW.run(w.id, w.match, w.match_date || null, w.created_at || null, w.real_result || null, w.pot || 0, w.next_pot || 0, w.weekly_amount || 0, w.finished || 0));
-    stmtW.finalize();
-
-    const stmtPr = db.prepare("INSERT INTO predictions (id, week_id, player_id, result) VALUES (?, ?, ?, ?)");
-    predictions.forEach(p => stmtPr.run(p.id, p.week_id, p.player_id, p.result));
-    stmtPr.finalize(() => {
-      res.json({ success: true, message: `Importados: ${players.length} jugadores, ${weeks.length} semanas, ${predictions.length} apuestas` });
-    });
-  });
 });
 
-app.post("/api/reset", (req, res) => {
-  db.serialize(() => {
-    db.run("DELETE FROM predictions");
-    db.run("DELETE FROM weeks");
-    db.run("DELETE FROM players");
-    db.run("DELETE FROM sqlite_sequence WHERE name IN ('players','weeks','predictions')", () => {
-      res.json({ success: true });
-    });
-  });
+app.post("/api/import", async (req, res) => {
+  const { players, weeks, predictions } = req.body;
+  if (!players || !weeks || !predictions) return res.status(400).json({ error: "JSON inválido: faltan datos" });
+  try {
+    await pool.query("DELETE FROM predictions");
+    await pool.query("DELETE FROM weeks");
+    await pool.query("DELETE FROM players");
+
+    for (const p of players) {
+      await pool.query("INSERT INTO players (id, name, order_position) VALUES ($1, $2, $3)", [p.id, p.name, p.order_position]);
+    }
+    for (const w of weeks) {
+      await pool.query(
+        "INSERT INTO weeks (id, match, match_date, created_at, real_result, pot, next_pot, weekly_amount, finished) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        [w.id, w.match, w.match_date || null, w.created_at || null, w.real_result || null, w.pot || 0, w.next_pot || 0, w.weekly_amount || 0, w.finished || 0]
+      );
+    }
+    for (const p of predictions) {
+      await pool.query("INSERT INTO predictions (id, week_id, player_id, result) VALUES ($1, $2, $3, $4)", [p.id, p.week_id, p.player_id, p.result]);
+    }
+
+    await pool.query("SELECT setval('players_id_seq', (SELECT MAX(id) FROM players))");
+    await pool.query("SELECT setval('weeks_id_seq', (SELECT MAX(id) FROM weeks))");
+    await pool.query("SELECT setval('predictions_id_seq', (SELECT MAX(id) FROM predictions))");
+
+    res.json({ success: true, message: `Importados: ${players.length} jugadores, ${weeks.length} semanas, ${predictions.length} apuestas` });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/reset", async (req, res) => {
+  try {
+    await pool.query("DELETE FROM predictions");
+    await pool.query("DELETE FROM weeks");
+    await pool.query("DELETE FROM players");
+    await pool.query("ALTER SEQUENCE players_id_seq RESTART WITH 1");
+    await pool.query("ALTER SEQUENCE weeks_id_seq RESTART WITH 1");
+    await pool.query("ALTER SEQUENCE predictions_id_seq RESTART WITH 1");
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ===================== START =====================
-app.listen(PORT, () => {
-  console.log(`✅ Servidor en http://localhost:${PORT}`);
-  console.log(`🔐 Login: ${ADMIN_USER} / ${ADMIN_PASS}`);
+initDB().then(() => {
+  app.listen(PORT, () => {
+    console.log(`✅ Servidor en http://localhost:${PORT}`);
+    console.log(`🔐 Login: ${ADMIN_USER} / ${ADMIN_PASS}`);
+  });
+}).catch(err => {
+  console.error("❌ Error conectando a la base de datos:", err);
+  process.exit(1);
 });
