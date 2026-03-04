@@ -1,9 +1,10 @@
 1. Crear cuenta render https://community.render.com/login
 2. Crear cuenta neon https://console.neon.tech/
-3. Descargarse los archivos del ghub: GitHub.com/cesar04rv/WebApuestas
+3. Descargarse los archivos del ghub: github.com/cesar04rv/WebApuestas
 4. Subir los archivos a tu  ghub (repo en público)
 5. Crear el proyecto de web server en Render, todo default.
 6. Conectar la cuenta del render al repo de ghub
 7. Crear la base de datos PostgreSQL en Neon
 Coger la Connection String y ponerla en un archivo .env de esta manera:
+
 DATABASE_URL = 'Connection String de Neon'
