@@ -27,8 +27,10 @@ app.use(session({
 
 // Middleware de autenticación
 app.use((req, res, next) => {
-  const openPaths = ["/api/login", "/api/me", "/login.html", "/login.css", "/login.js"];
-  if (openPaths.includes(req.path) || req.session.authenticated) return next();
+  const openPaths = ["/api/login", "/api/me", "/login.html", "/login.css", "/login.js", "/logo.png", "/logo.jpeg"];
+  const openExtensions = [".png", ".jpg", ".jpeg", ".ico", ".svg", ".webp", ".css", ".js", ".woff", ".woff2"];
+  const isOpenAsset = openExtensions.some(ext => req.path.endsWith(ext));
+  if (openPaths.includes(req.path) || isOpenAsset || req.session.authenticated) return next();
   if (req.path.startsWith("/api/")) return res.status(401).json({ error: "No autenticado" });
   if (req.accepts("html")) return res.redirect("/login.html");
   res.status(401).json({ error: "No autenticado" });
