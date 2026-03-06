@@ -564,6 +564,94 @@ async function loadHistory() {
   });
 }
 
+// ===================== WEEK LOG =====================
+let weekLogVisible = false;
+
+async function toggleWeekLog() {
+  weekLogVisible = !weekLogVisible;
+  const container = document.getElementById("weekLogList");
+  const btn = document.querySelector('[onclick="toggleWeekLog()"]');
+  if (weekLogVisible) {
+    container.classList.remove("hidden");
+    if (btn) btn.textContent = "Ocultar";
+    loadWeekLog();
+  } else {
+    container.classList.add("hidden");
+    if (btn) btn.textContent = "Ver más";
+  }
+}
+
+async function loadWeekLog() {
+  const container = document.getElementById("weekLogList");
+  container.innerHTML = '<p class="empty-state">Cargando...</p>';
+  const weeks = await api("/week-log");
+
+  if (!weeks?.length) {
+    container.innerHTML = '<p class="empty-state">No hay semanas cerradas todavía.</p>';
+    return;
+  }
+
+  container.innerHTML = "";
+  weeks.forEach(w => {
+    const roundLabel = w.round_number
+      ? (w.round_number.toUpperCase().startsWith("JORNADA") ? w.round_number.toUpperCase() : `JORNADA ${w.round_number.toUpperCase()}`)
+      : "";
+
+    let matchDateStr = "";
+    if (w.match_date) {
+      try {
+        const d = new Date(w.match_date);
+        matchDateStr = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
+      } catch(e) {}
+    }
+
+    const hasWinner = w.predictions.some(p => p.correct);
+
+    // Build predictions rows
+    const predsHTML = w.predictions.length
+      ? w.predictions.map(p => `
+          <div class="wl-pred ${p.correct ? "correct" : ""}">
+            <span class="wl-pred-order">#${p.order}</span>
+            <span class="wl-pred-name">${p.player_name}</span>
+            <span class="wl-pred-result">${p.result}</span>
+            ${p.correct ? '<span class="wl-pred-badge">✓</span>' : ''}
+          </div>
+        `).join("")
+      : '<p class="empty-state" style="padding:8px 0">Nadie apostó esta semana</p>';
+
+    const excludedHTML = w.excluded?.length
+      ? `<div class="wl-excluded">No jugaron: ${w.excluded.join(", ")}</div>`
+      : "";
+
+    const div = document.createElement("div");
+    div.className = "weeklog-item";
+    div.innerHTML = `
+      <div class="wl-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="wl-header-left">
+          ${roundLabel ? `<span class="wl-round">${roundLabel}</span>` : ""}
+          <span class="wl-match">${w.match}</span>
+          ${matchDateStr ? `<span class="wl-date">${matchDateStr}</span>` : ""}
+        </div>
+        <div class="wl-header-right">
+          <span class="wl-real-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</span>
+          <span class="wl-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</span>
+          <span class="wl-chevron">▾</span>
+        </div>
+      </div>
+      <div class="wl-body">
+        <div class="wl-meta">
+          <span>💶 ${w.weekly_amount || 1}€ por persona</span>
+          ${excludedHTML}
+        </div>
+        <div class="wl-preds-grid">
+          ${predsHTML}
+        </div>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
 // ===================== RANKINGS =====================
 async function loadRankings() {
   rankingsData = await api("/rankings");

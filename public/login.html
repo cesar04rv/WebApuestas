@@ -3,201 +3,205 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PorraPLUS ELITE — Login</title>
+  <title>PorraPLUS ELITE ⚽</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: 'Barlow', sans-serif;
-      background: #0a0e1a;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-    }
-
-    /* pitch lines bg */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background:
-        radial-gradient(ellipse 80% 60% at 50% 50%, rgba(0,80,20,0.18) 0%, transparent 70%),
-        repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 50px),
-        repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0px, rgba(255,255,255,0.015) 1px, transparent 1px, transparent 50px);
-      pointer-events: none;
-    }
-
-    .login-box {
-      background: #111827;
-      border: 1px solid rgba(255,255,255,0.07);
-      border-radius: 20px;
-      padding: 44px 40px;
-      width: 100%;
-      max-width: 380px;
-      box-shadow: 0 30px 80px rgba(0,0,0,0.6);
-      position: relative;
-      animation: rise 0.4s cubic-bezier(0.34,1.56,0.64,1);
-    }
-
-    @keyframes rise {
-      from { transform: translateY(30px); opacity: 0; }
-      to { transform: translateY(0); opacity: 1; }
-    }
-
-    .login-logo {
-      text-align: center;
-      margin-bottom: 32px;
-    }
-
-    .login-img {
-      width: 80px;
-      height: 80px;
-      object-fit: contain;
-      display: block;
-      margin: 0 auto 12px;
-      border-radius: 10px;
-    }
-
-    .login-title {
-      font-family: 'Bebas Neue', cursive;
-      font-size: 36px;
-      letter-spacing: 3px;
-      color: #00c853;
-      line-height: 1;
-    }
-
-    .login-sub {
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 11px;
-      letter-spacing: 3px;
-      color: #6b7a99;
-      margin-top: 4px;
-    }
-
-    .field {
-      margin-bottom: 16px;
-    }
-
-    label {
-      display: block;
-      font-family: 'Barlow Condensed', sans-serif;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: #6b7a99;
-      margin-bottom: 6px;
-    }
-
-    input {
-      width: 100%;
-      background: #0a0e1a;
-      border: 1px solid rgba(255,255,255,0.08);
-      color: white;
-      padding: 12px 14px;
-      border-radius: 10px;
-      font-family: 'Barlow', sans-serif;
-      font-size: 15px;
-      outline: none;
-      transition: border-color 0.2s;
-    }
-
-    input:focus { border-color: #00c853; }
-
-    .btn-login {
-      width: 100%;
-      margin-top: 8px;
-      padding: 14px;
-      background: #00c853;
-      border: none;
-      border-radius: 10px;
-      color: black;
-      font-family: 'Bebas Neue', cursive;
-      font-size: 20px;
-      letter-spacing: 3px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .btn-login:hover { background: #00e65c; transform: translateY(-1px); }
-    .btn-login:active { transform: translateY(0); }
-
-    .error-msg {
-      background: rgba(244,67,54,0.12);
-      border: 1px solid rgba(244,67,54,0.3);
-      color: #f44336;
-      border-radius: 8px;
-      padding: 10px 14px;
-      font-size: 13px;
-      margin-top: 14px;
-      text-align: center;
-      display: none;
-    }
-  </style>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="login-box">
-    <div class="login-logo">
-      <img src="logo.png" class="login-img" alt="PorraPLUS ELITE">
-      <div class="login-title">PORRA<span style="color:#ffab00">PLUS</span></div>
-      <div class="login-sub">ELITE · ACCESO</div>
-    </div>
 
-    <div class="field">
-      <label>Usuario</label>
-      <input type="text" id="username" placeholder="Tu usuario" autocomplete="username">
-    </div>
+<div class="noise"></div>
 
-    <div class="field">
-      <label>Contraseña</label>
-      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+<header class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <img src="logo.png" class="logo-img" alt="PorraPLUS ELITE logo">
+      <span class="logo-text">PORRA<span class="logo-sub">PLUS ELITE</span></span>
     </div>
-
-    <button class="btn-login" onclick="doLogin()">ENTRAR</button>
-    <div class="error-msg" id="errorMsg"></div>
+    <div class="header-actions">
+      <button class="btn-admin-toggle" onclick="toggleAdmin()">⚙ Admin</button>
+      <button class="btn-logout" onclick="doLogout()">Salir</button>
+    </div>
   </div>
+</header>
 
-  <script>
-    fetch("/api/me").then(r => r.json()).then(d => {
-      if (d.authenticated) window.location = "/";
-    });
+<main class="container">
 
-    document.addEventListener("keydown", e => {
-      if (e.key === "Enter") doLogin();
-    });
+  <!-- 1. SCOREBOARD -->
+  <section class="scoreboard" id="scoreboard">
+    <div class="scoreboard-label">PARTIDO DE LA SEMANA</div>
+    <div class="scoreboard-round" id="weekRound"></div>
+    <div class="scoreboard-match" id="weekInfo">Cargando...</div>
+    <div class="scoreboard-datetime" id="weekDatetime"></div>
+    <div class="scoreboard-pot" id="potInfo"></div>
+    <div class="scoreboard-status" id="weekStatus"></div>
+  </section>
 
-    async function doLogin() {
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value;
-      const errEl = document.getElementById("errorMsg");
-      errEl.style.display = "none";
+  <!-- 2. TURNO + APOSTAR -->
+  <section class="turn-banner" id="turnBanner">
+    <div class="turn-inner">
+      <span class="turn-label">LE TOCA</span>
+      <span class="turn-name" id="currentTurnName">—</span>
+    </div>
+    <div class="turn-form">
+      <div class="score-input-group">
+        <input type="number" id="resultLocal" min="0" max="99" placeholder="0" autocomplete="off">
+        <span class="score-sep">—</span>
+        <input type="number" id="resultVisit" min="0" max="99" placeholder="0" autocomplete="off">
+      </div>
+      <button class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
+    </div>
+  </section>
 
-      if (!username || !password) {
-        errEl.textContent = "Introduce usuario y contraseña";
-        errEl.style.display = "block";
-        return;
-      }
+  <!-- 3. JUGADORES -->
+  <section class="card">
+    <div class="card-header">
+      <h2>👥 Jugadores</h2>
+      <span class="badge" id="playersCount">0</span>
+    </div>
+    <div id="playersList" class="players-grid"></div>
+  </section>
 
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
+  <!-- 4. RANKINGS -->
+  <section class="card">
+    <div class="card-header">
+      <h2>🏆 Rankings</h2>
+      <div class="tab-group">
+        <button class="tab active" onclick="switchTab('wins', event)">Victorias</button>
+        <button class="tab" onclick="switchTab('money', event)">Dinero</button>
+        <button class="tab" onclick="switchTab('rate', event)">Precisión</button>
+      </div>
+    </div>
+    <div id="rankingsList" class="rankings-list"></div>
+  </section>
 
-      const data = await res.json();
+  <!-- 5. HISTORIAL -->
+  <section class="card">
+    <div class="card-header">
+      <h2>📋 Historial</h2>
+      <button class="btn btn-sm" onclick="toggleHistory()">Ver más</button>
+    </div>
+    <div id="historyList" class="history-list hidden"></div>
+  </section>
 
-      if (data.success) {
-        window.location = "/";
-      } else {
-        errEl.textContent = data.error || "Credenciales incorrectas";
-        errEl.style.display = "block";
-        document.getElementById("password").value = "";
-      }
-    }
-  </script>
+  <!-- 6. REGISTRO DETALLADO -->
+  <section class="card">
+    <div class="card-header">
+      <h2>📒 Registro de Semanas</h2>
+      <button class="btn btn-sm" onclick="toggleWeekLog()">Ver más</button>
+    </div>
+    <div id="weekLogList" class="weeklog-list hidden"></div>
+  </section>
+
+</main>
+
+<!-- ADMIN DRAWER -->
+<div class="drawer-overlay hidden" id="drawerOverlay" onclick="toggleAdmin()"></div>
+
+<aside class="admin-drawer" id="adminDrawer">
+  <div class="drawer-header">
+    <span class="drawer-title">⚙ Administración</span>
+    <button class="drawer-close" onclick="toggleAdmin()">✕</button>
+  </div>
+  <div class="drawer-body">
+
+    <div class="drawer-section">
+      <h3>📅 Nueva Semana</h3>
+      <div class="input-col">
+        <input type="text" id="newRound" placeholder="Jornada (ej: J28)">
+        <input type="text" id="newMatch" placeholder="Ej: Real Madrid vs Barça">
+        <input type="datetime-local" id="newMatchDate" title="Fecha y hora del partido (opcional)">
+        <div id="newExcludeList" class="exclude-list"></div>
+        <button class="btn btn-blue" onclick="createWeek()">Crear Semana</button>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>✏️ Editar Partido Actual</h3>
+      <div class="input-col">
+        <input type="text" id="editRound" placeholder="Jornada (ej: J28)">
+        <input type="text" id="editMatch" placeholder="Nuevo nombre del partido">
+        <input type="datetime-local" id="editMatchDate" title="Nueva fecha y hora (opcional)">
+        <div id="editExcludeList" class="exclude-list"></div>
+        <div class="warn-note">⚠️ Se borrarán todas las apuestas actuales</div>
+        <button class="btn btn-amber" onclick="editWeek()">Guardar Cambios</button>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>🏁 Cerrar Semana</h3>
+      <div class="input-col">
+        <div class="score-input-group">
+          <input type="number" id="realLocal" min="0" max="99" placeholder="0">
+          <span class="score-sep">—</span>
+          <input type="number" id="realVisit" min="0" max="99" placeholder="0">
+        </div>
+        <input type="number" id="weeklyAmount" placeholder="€ por persona (por defecto 1€)" min="0">
+        <button class="btn btn-red" onclick="closeWeek()">Cerrar Semana</button>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>➕ Añadir Jugador</h3>
+      <div class="input-col">
+        <input type="text" id="newPlayerName" placeholder="Nombre del jugador">
+        <button class="btn btn-green" onclick="addPlayer()">Añadir</button>
+      </div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>👥 Gestionar Jugadores</h3>
+      <div id="managePlayersList" class="manage-players-list"></div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>🔀 Reordenar Jugadores</h3>
+      <div id="reorderList" class="reorder-list"></div>
+      <button class="btn btn-green" onclick="saveOrder()">Guardar Orden</button>
+    </div>
+
+    <div class="drawer-section danger-section">
+      <h3>🗑️ Eliminar Semana Actual</h3>
+      <p class="warn-note">Elimina la semana activa y todas sus apuestas permanentemente.</p>
+      <button class="btn btn-red-outline" onclick="deleteWeek()">Eliminar Semana</button>
+    </div>
+
+    <div class="drawer-section backup-section">
+      <h3>💾 Copia de Seguridad</h3>
+      <div class="input-col">
+        <button class="btn btn-backup" onclick="exportData()">⬇️ Descargar copia (JSON)</button>
+        <label class="btn btn-backup" style="text-align:center;cursor:pointer;">
+          ⬆️ Restaurar desde JSON
+          <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+        </label>
+      </div>
+    </div>
+
+    <div class="drawer-section danger-section">
+      <h3>☢️ Borrar Todos los Datos</h3>
+      <p class="warn-note">Elimina jugadores, semanas y apuestas. Acción irreversible.</p>
+      <button class="btn btn-red-outline" onclick="resetAll()">Borrar todo</button>
+    </div>
+
+  </div>
+</aside>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- CONFIRM MODAL -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-icon" id="modalIcon">⚠️</div>
+    <div class="modal-title" id="modalTitle">¿Estás seguro?</div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-confirm" id="modalConfirmBtn">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script src="script.js"></script>
 </body>
 </html>

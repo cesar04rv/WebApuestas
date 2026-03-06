@@ -356,6 +356,54 @@ app.get("/rankings", async (req, res) => {
   }
 });
 
+// ===================== WEEK DETAIL LOG =====================
+app.get("/week-log", async (req, res) => {
+  try {
+    const { rows: weeks } = await pool.query(
+      "SELECT * FROM weeks WHERE finished = 1 ORDER BY id DESC LIMIT 50"
+    );
+    const { rows: allPlayers } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
+
+    const result = [];
+    for (const w of weeks) {
+      const { rows: preds } = await pool.query(`
+        SELECT pr.*, p.name as player_name
+        FROM predictions pr
+        JOIN players p ON p.id = pr.player_id
+        WHERE pr.week_id = $1
+        ORDER BY pr.id ASC
+      `, [w.id]);
+
+      const excludedIds = w.excluded_players
+        ? w.excluded_players.split(",").filter(Boolean).map(Number)
+        : [];
+      const excludedNames = excludedIds
+        .map(id => allPlayers.find(p => p.id === id)?.name)
+        .filter(Boolean);
+
+      result.push({
+        id: w.id,
+        match: w.match,
+        round_number: w.round_number,
+        match_date: w.match_date,
+        real_result: w.real_result,
+        pot: w.pot,
+        weekly_amount: w.weekly_amount,
+        excluded: excludedNames,
+        predictions: preds.map((pr, i) => ({
+          order: i + 1,
+          player_name: pr.player_name,
+          result: pr.result,
+          correct: pr.result === w.real_result
+        }))
+      });
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ===================== PAYMENTS =====================
 app.get("/payments/:week_id", async (req, res) => {
   try {
