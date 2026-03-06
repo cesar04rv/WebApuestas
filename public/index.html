@@ -30,6 +30,7 @@
   <!-- 1. SCOREBOARD -->
   <section class="scoreboard" id="scoreboard">
     <div class="scoreboard-label">PARTIDO DE LA SEMANA</div>
+    <div class="scoreboard-round" id="weekRound"></div>
     <div class="scoreboard-match" id="weekInfo">Cargando...</div>
     <div class="scoreboard-datetime" id="weekDatetime"></div>
     <div class="scoreboard-pot" id="potInfo"></div>
@@ -98,8 +99,10 @@
     <div class="drawer-section">
       <h3>📅 Nueva Semana</h3>
       <div class="input-col">
+        <input type="text" id="newRound" placeholder="Jornada (ej: J28)">
         <input type="text" id="newMatch" placeholder="Ej: Real Madrid vs Barça">
         <input type="datetime-local" id="newMatchDate" title="Fecha y hora del partido (opcional)">
+        <div id="newExcludeList" class="exclude-list"></div>
         <button class="btn btn-blue" onclick="createWeek()">Crear Semana</button>
       </div>
     </div>
@@ -107,8 +110,10 @@
     <div class="drawer-section">
       <h3>✏️ Editar Partido Actual</h3>
       <div class="input-col">
+        <input type="text" id="editRound" placeholder="Jornada (ej: J28)">
         <input type="text" id="editMatch" placeholder="Nuevo nombre del partido">
         <input type="datetime-local" id="editMatchDate" title="Nueva fecha y hora (opcional)">
+        <div id="editExcludeList" class="exclude-list"></div>
         <div class="warn-note">⚠️ Se borrarán todas las apuestas actuales</div>
         <button class="btn btn-amber" onclick="editWeek()">Guardar Cambios</button>
       </div>
@@ -133,6 +138,11 @@
         <input type="text" id="newPlayerName" placeholder="Nombre del jugador">
         <button class="btn btn-green" onclick="addPlayer()">Añadir</button>
       </div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>👥 Gestionar Jugadores</h3>
+      <div id="managePlayersList" class="manage-players-list"></div>
     </div>
 
     <div class="drawer-section">

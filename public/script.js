@@ -6,10 +6,12 @@ let currentTurnPlayer = null;
 let historyVisible = false;
 let rankingsData = [];
 let currentTab = "wins";
+let payments = [];
+let newExcludedPlayers = [];
+let editExcludedPlayers = [];
 
 // ===================== INIT =====================
 (async () => {
-  // Verificar sesión
   const me = await api("/api/me").catch(() => null);
   if (!me || !me.authenticated) {
     window.location = "/login.html";
@@ -22,11 +24,14 @@ async function loadData() {
   await loadPlayers();
   await loadWeek();
   await loadPredictions();
+  await loadPayments();
   calculateTurn();
   renderPlayers();
   renderReorder();
+  renderManagePlayers();
+  renderExcludeLists();
   await loadRankings();
-  document.getElementById("playersCount").textContent = players.length;
+  document.getElementById("playersCount").textContent = players.filter(p => p.active).length;
   if (historyVisible) loadHistory();
 }
 
@@ -64,6 +69,7 @@ async function loadWeek() {
     document.getElementById("potInfo").textContent = "";
     document.getElementById("weekDatetime").textContent = "";
     document.getElementById("weekStatus").textContent = "Crea una nueva semana desde Admin";
+    document.getElementById("weekRound").textContent = "";
     document.getElementById("turnBanner").classList.add("hidden");
     return;
   }
@@ -73,6 +79,10 @@ async function loadWeek() {
     currentWeek.pot > 0 ? `💰 Bote: ${currentWeek.pot} €` : "";
   document.getElementById("weekStatus").textContent = "SEMANA EN CURSO";
   document.getElementById("turnBanner").classList.remove("hidden");
+
+  // Jornada
+  const roundEl = document.getElementById("weekRound");
+  roundEl.textContent = currentWeek.round_number ? currentWeek.round_number : "";
 
   // Fecha del partido
   const dtEl = document.getElementById("weekDatetime");
@@ -90,6 +100,22 @@ async function loadPredictions() {
   predictions = await api("/predictions/" + currentWeek.id);
 }
 
+async function loadPayments() {
+  if (!currentWeek) { payments = []; return; }
+  payments = await api("/payments/" + currentWeek.id).catch(() => []);
+}
+
+// ===================== EXCLUDED PLAYERS HELPERS =====================
+function getExcludedForCurrentWeek() {
+  if (!currentWeek || !currentWeek.excluded_players) return [];
+  return currentWeek.excluded_players.split(",").filter(Boolean).map(Number);
+}
+
+function getActivePlayers() {
+  const excluded = getExcludedForCurrentWeek();
+  return players.filter(p => p.active && !excluded.includes(p.id));
+}
+
 // ===================== TURN =====================
 function calculateTurn() {
   if (!currentWeek || players.length === 0) {
@@ -98,15 +124,22 @@ function calculateTurn() {
     return;
   }
 
-  const allPlayed = players.every(p => predictions.find(pr => pr.player_id === p.id));
+  const activePlayers = getActivePlayers();
+  if (!activePlayers.length) {
+    currentTurnPlayer = null;
+    document.getElementById("currentTurnName").textContent = "Sin jugadores activos";
+    return;
+  }
+
+  const allPlayed = activePlayers.every(p => predictions.find(pr => pr.player_id === p.id));
   if (allPlayed) {
     currentTurnPlayer = null;
     document.getElementById("currentTurnName").textContent = "Todos han apostado";
     return;
   }
 
-  const turnIndex = predictions.length % players.length;
-  currentTurnPlayer = players[turnIndex];
+  const turnIndex = predictions.length % activePlayers.length;
+  currentTurnPlayer = activePlayers[turnIndex];
   document.getElementById("currentTurnName").textContent = currentTurnPlayer.name.toUpperCase();
 }
 
@@ -115,14 +148,17 @@ function renderPlayers() {
   const container = document.getElementById("playersList");
   container.innerHTML = "";
 
-  if (players.length === 0) {
-    container.innerHTML = '<p class="empty-state">No hay jugadores todavía. Añade desde Admin.</p>';
+  const activePlayers = getActivePlayers();
+
+  if (activePlayers.length === 0) {
+    container.innerHTML = '<p class="empty-state">No hay jugadores activos. Añade desde Admin.</p>';
     return;
   }
 
-  players.forEach((p, i) => {
+  activePlayers.forEach((p, i) => {
     const prediction = predictions.find(pr => pr.player_id === p.id);
     const isTurn = currentTurnPlayer && p.id === currentTurnPlayer.id;
+    const isPaid = payments.find(pay => pay.player_id === p.id && pay.paid);
 
     const div = document.createElement("div");
     div.className = "player-card" + (isTurn ? " turn" : "") + (prediction ? " played" : "");
@@ -132,8 +168,152 @@ function renderPlayers() {
       <div class="player-result ${prediction ? "" : "empty"}">
         ${prediction ? prediction.result : "Sin apostar"}
       </div>
+      ${currentWeek ? `
+      <div class="player-payment">
+        <button class="btn-pay ${isPaid ? 'paid' : ''}" onclick="togglePayment(${p.id}, ${isPaid ? 1 : 0})" title="${isPaid ? 'Pagado ✓' : 'Marcar como pagado'}">
+          ${isPaid ? '✓ Pagado' : '€ Pagar'}
+        </button>
+      </div>` : ''}
     `;
     container.appendChild(div);
+  });
+}
+
+// ===================== PAYMENT =====================
+function togglePayment(playerId, currentPaid) {
+  const player = players.find(p => p.id === playerId);
+  if (!player) return;
+
+  if (!currentPaid) {
+    // Confirmar pago
+    showModal({
+      icon: "💶",
+      title: "¿Confirmar pago?",
+      body: `¿Marcar a <strong>${player.name}</strong> como pagado esta semana?`,
+      confirmText: "Sí, ha pagado",
+      danger: false,
+      onConfirm: async () => {
+        await post("/payment-toggle", { week_id: currentWeek.id, player_id: playerId, paid: true });
+        toast(`✓ ${player.name} marcado como pagado`, "success");
+        await loadPayments();
+        renderPlayers();
+      }
+    });
+  } else {
+    // Confirmar desmarcar
+    showModal({
+      icon: "↩️",
+      title: "¿Desmarcar pago?",
+      body: `¿Quitar el pago de <strong>${player.name}</strong>?`,
+      confirmText: "Sí, desmarcar",
+      danger: true,
+      onConfirm: async () => {
+        await post("/payment-toggle", { week_id: currentWeek.id, player_id: playerId, paid: false });
+        toast(`${player.name} desmarcado`, "info");
+        await loadPayments();
+        renderPlayers();
+      }
+    });
+  }
+}
+
+// ===================== RENDER EXCLUDE LISTS =====================
+function renderExcludeLists() {
+  renderExcludeList("newExcludeList", newExcludedPlayers, (id) => {
+    const idx = newExcludedPlayers.indexOf(id);
+    if (idx > -1) newExcludedPlayers.splice(idx, 1);
+    else newExcludedPlayers.push(id);
+    renderExcludeList("newExcludeList", newExcludedPlayers, arguments.callee);
+  });
+
+  const currentExcluded = getExcludedForCurrentWeek();
+  if (editExcludedPlayers.length === 0 && currentExcluded.length > 0) {
+    editExcludedPlayers = [...currentExcluded];
+  }
+
+  renderExcludeList("editExcludeList", editExcludedPlayers, (id) => {
+    const idx = editExcludedPlayers.indexOf(id);
+    if (idx > -1) editExcludedPlayers.splice(idx, 1);
+    else editExcludedPlayers.push(id);
+    renderExcludeList("editExcludeList", editExcludedPlayers, arguments.callee);
+  });
+}
+
+function renderExcludeList(containerId, excludedArr, toggleFn) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const activePlayers = players.filter(p => p.active);
+  if (!activePlayers.length) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `<div class="exclude-label">No juegan esta semana:</div>`;
+  activePlayers.forEach(p => {
+    const excluded = excludedArr.includes(p.id);
+    const btn = document.createElement("button");
+    btn.className = "btn-exclude" + (excluded ? " excluded" : "");
+    btn.textContent = (excluded ? "✗ " : "") + p.name;
+    btn.onclick = () => toggleFn(p.id);
+    container.appendChild(btn);
+  });
+}
+
+// ===================== RENDER MANAGE PLAYERS =====================
+function renderManagePlayers() {
+  const container = document.getElementById("managePlayersList");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (!players.length) {
+    container.innerHTML = '<p class="empty-state">No hay jugadores.</p>';
+    return;
+  }
+
+  players.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "manage-player-item" + (p.active ? "" : " inactive");
+    div.innerHTML = `
+      <span class="manage-player-name">${p.name}${!p.active ? ' <span class="inactive-tag">inactivo</span>' : ''}</span>
+      ${p.active
+        ? `<button class="btn-deactivate" onclick="deactivatePlayer(${p.id}, '${p.name}')">Desactivar</button>`
+        : `<button class="btn-reactivate" onclick="reactivatePlayer(${p.id}, '${p.name}')">Reactivar</button>`
+      }
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function deactivatePlayer(id, name) {
+  showModal({
+    icon: "⏸️",
+    title: "¿Desactivar jugador?",
+    body: `<strong>${name}</strong> quedará inactivo. No participará en futuras semanas pero se conserva su historial.<br><br>Puedes reactivarlo cuando quieras.`,
+    confirmText: "Desactivar",
+    danger: true,
+    onConfirm: async () => {
+      const res = await post("/deactivate-player", { player_id: id });
+      if (res.error) { toast(res.error, "error"); return; }
+      toast(`${name} desactivado`, "info");
+      loadData();
+    }
+  });
+}
+
+async function reactivatePlayer(id, name) {
+  showModal({
+    icon: "▶️",
+    title: "¿Reactivar jugador?",
+    body: `<strong>${name}</strong> volverá a participar en las semanas.`,
+    confirmText: "Reactivar",
+    danger: false,
+    onConfirm: async () => {
+      const res = await post("/reactivate-player", { player_id: id });
+      if (res.error) { toast(res.error, "error"); return; }
+      toast(`${name} reactivado ✓`, "success");
+      loadData();
+    }
   });
 }
 
@@ -141,9 +321,9 @@ function renderPlayers() {
 function renderReorder() {
   const container = document.getElementById("reorderList");
   container.innerHTML = "";
-  players.sort((a, b) => a.order_position - b.order_position);
+  const activePlayers = players.filter(p => p.active).sort((a, b) => a.order_position - b.order_position);
 
-  players.forEach((p, i) => {
+  activePlayers.forEach((p, i) => {
     const div = document.createElement("div");
     div.className = "reorder-item";
     div.innerHTML = `
@@ -157,27 +337,29 @@ function renderReorder() {
 }
 
 function moveUp(id) {
-  const index = players.findIndex(p => p.id === id);
+  const activePlayers = players.filter(p => p.active).sort((a, b) => a.order_position - b.order_position);
+  const index = activePlayers.findIndex(p => p.id === id);
   if (index > 0) {
-    [players[index].order_position, players[index - 1].order_position] =
-      [players[index - 1].order_position, players[index].order_position];
+    [activePlayers[index].order_position, activePlayers[index - 1].order_position] =
+      [activePlayers[index - 1].order_position, activePlayers[index].order_position];
     players.sort((a, b) => a.order_position - b.order_position);
     renderReorder(); renderPlayers();
   }
 }
 
 function moveDown(id) {
-  const index = players.findIndex(p => p.id === id);
-  if (index < players.length - 1) {
-    [players[index].order_position, players[index + 1].order_position] =
-      [players[index + 1].order_position, players[index].order_position];
+  const activePlayers = players.filter(p => p.active).sort((a, b) => a.order_position - b.order_position);
+  const index = activePlayers.findIndex(p => p.id === id);
+  if (index < activePlayers.length - 1) {
+    [activePlayers[index].order_position, activePlayers[index + 1].order_position] =
+      [activePlayers[index + 1].order_position, activePlayers[index].order_position];
     players.sort((a, b) => a.order_position - b.order_position);
     renderReorder(); renderPlayers();
   }
 }
 
 async function saveOrder() {
-  const orders = players.map(p => ({ id: p.id, order_position: p.order_position }));
+  const orders = players.filter(p => p.active).map(p => ({ id: p.id, order_position: p.order_position }));
   await post("/reorder-players", { orders });
   toast("Orden guardado ✓", "success");
   loadData();
@@ -185,7 +367,6 @@ async function saveOrder() {
 
 // ===================== ACTIONS =====================
 
-// Apostar — con modal de confirmación
 function sendPrediction() {
   if (!currentWeek) return toast("No hay semana activa", "error");
   if (!currentTurnPlayer) return toast("No hay turno activo", "error");
@@ -235,12 +416,15 @@ async function createWeek() {
   const match = document.getElementById("newMatch").value.trim();
   if (!match) return toast("Escribe el partido", "error");
   const match_date = document.getElementById("newMatchDate").value || null;
+  const round_number = document.getElementById("newRound").value.trim() || null;
 
-  const data = await post("/new-week", { match, match_date });
+  const data = await post("/new-week", { match, match_date, round_number, excluded_players: newExcludedPlayers });
   if (data.error) { toast(data.error, "error"); return; }
   toast("✓ Semana creada", "success");
   document.getElementById("newMatch").value = "";
   document.getElementById("newMatchDate").value = "";
+  document.getElementById("newRound").value = "";
+  newExcludedPlayers = [];
   toggleAdmin();
   loadData();
 }
@@ -250,6 +434,7 @@ function editWeek() {
   const match = document.getElementById("editMatch").value.trim();
   if (!match) return toast("Escribe el nuevo nombre del partido", "error");
   const match_date = document.getElementById("editMatchDate").value || null;
+  const round_number = document.getElementById("editRound").value.trim() || null;
 
   showModal({
     icon: "✏️",
@@ -258,11 +443,16 @@ function editWeek() {
     confirmText: "Sí, editar y borrar apuestas",
     danger: true,
     onConfirm: async () => {
-      const data = await post("/edit-week", { week_id: currentWeek.id, match, match_date });
+      const data = await post("/edit-week", {
+        week_id: currentWeek.id, match, match_date, round_number,
+        excluded_players: editExcludedPlayers
+      });
       if (data.error) { toast(data.error, "error"); return; }
       toast("✓ Partido actualizado y apuestas reiniciadas", "info");
       document.getElementById("editMatch").value = "";
       document.getElementById("editMatchDate").value = "";
+      document.getElementById("editRound").value = "";
+      editExcludedPlayers = [];
       loadData();
     }
   });
@@ -302,6 +492,7 @@ async function closeWeek() {
   document.getElementById("realLocal").value = "";
   document.getElementById("realVisit").value = "";
   document.getElementById("weeklyAmount").value = "";
+  payments = [];
   toggleAdmin();
   loadData();
   if (historyVisible) loadHistory();
@@ -330,18 +521,14 @@ async function loadHistory() {
 
   container.innerHTML = "";
   weeks.forEach(w => {
-    // Formatear fecha de creación
     let dateStr = "";
     if (w.created_at) {
       try {
         const d = new Date(w.created_at);
         dateStr = d.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
-      } catch(e) {
-        dateStr = w.created_at;
-      }
+      } catch(e) { dateStr = w.created_at; }
     }
 
-    // Fecha del partido si existe
     let matchDateStr = "";
     if (w.match_date) {
       try {
@@ -350,11 +537,13 @@ async function loadHistory() {
       } catch(e) {}
     }
 
+    const roundStr = w.round_number ? `<span class="history-round">${w.round_number}</span>` : "";
+
     const div = document.createElement("div");
     div.className = "history-item";
     div.innerHTML = `
       <div>
-        <div class="history-match">${w.match}</div>
+        <div class="history-match">${roundStr}${w.match}</div>
         <div class="history-meta">
           ${dateStr}${matchDateStr} · ${w.winners ? "🏆 " + w.winners : "Sin acertantes"}
         </div>
@@ -407,17 +596,17 @@ function renderRankings() {
     const rate = p.total_predictions > 0 ? ((p.wins / p.total_predictions) * 100).toFixed(0) : 0;
     const displayValue = currentTab === "wins" ? p.wins : currentTab === "money" ? (p.money_won || 0) + "€" : rate + "%";
     const subText = currentTab === "wins"
-      ? `${p.money_won || 0}€ ganados · ${rate}% acierto`
+      ? `${p.money_won || 0}€ ganados · ${rate}% acierto · ${p.total_predictions} apuestas`
       : currentTab === "money"
       ? `${p.wins} victorias · ${rate}% acierto`
       : `${p.wins} victorias · ${p.total_predictions} apuestas`;
 
     const div = document.createElement("div");
-    div.className = "ranking-item";
+    div.className = "ranking-item" + (p.active == 0 ? " inactive-player" : "");
     div.innerHTML = `
       <span class="ranking-pos">${i + 1}</span>
       <span class="ranking-medal">${medals[i] || ""}</span>
-      <span class="ranking-name">${p.name}</span>
+      <span class="ranking-name">${p.name}${p.active == 0 ? ' <span class="inactive-tag">inactivo</span>' : ''}</span>
       <div style="text-align:right">
         <div class="ranking-value">${displayValue}</div>
         <div class="ranking-sub">${subText}</div>
@@ -438,6 +627,17 @@ function toggleAdmin() {
     overlay.classList.add("hidden");
     document.body.style.overflow = "";
   } else {
+    // Pre-fill edit fields with current week data
+    if (currentWeek) {
+      document.getElementById("editMatch").value = currentWeek.match || "";
+      document.getElementById("editRound").value = currentWeek.round_number || "";
+      if (currentWeek.match_date) {
+        document.getElementById("editMatchDate").value = currentWeek.match_date.slice(0, 16);
+      }
+      editExcludedPlayers = getExcludedForCurrentWeek();
+    }
+    renderExcludeLists();
+    renderManagePlayers();
     drawer.classList.add("open");
     overlay.classList.remove("hidden");
     document.body.style.overflow = "hidden";
@@ -473,7 +673,6 @@ document.getElementById("modalOverlay").addEventListener("click", (e) => {
 });
 
 // ===================== BACKUP / RESTORE / RESET =====================
-
 function exportData() {
   window.location.href = "/api/export";
 }
@@ -506,7 +705,6 @@ function importData(event) {
           toggleAdmin();
           loadData();
         }
-        // Reset file input so same file can be selected again
         document.getElementById("importFile").value = "";
       }
     });
@@ -543,6 +741,7 @@ function toast(msg, type = "info") {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove("show"), 3500);
 }
+
 // ===================== KEYBOARD & AUTO-JUMP =====================
 document.addEventListener("DOMContentLoaded", () => {
   const autoJump = (fromId, toId) => {
@@ -568,7 +767,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.key === "Enter") sendPrediction();
   });
 
-  // Cerrar drawer o modal con Escape
   document.addEventListener("keydown", e => {
     if (e.key !== "Escape") return;
     const drawer = document.getElementById("adminDrawer");

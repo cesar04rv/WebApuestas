@@ -42,7 +42,8 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS players (
       id SERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
-      order_position INTEGER
+      order_position INTEGER,
+      active INTEGER DEFAULT 1
     )
   `);
   await pool.query(`
@@ -55,9 +56,15 @@ async function initDB() {
       pot INTEGER DEFAULT 0,
       next_pot INTEGER DEFAULT 0,
       weekly_amount INTEGER DEFAULT 0,
-      finished INTEGER DEFAULT 0
+      finished INTEGER DEFAULT 0,
+      round_number TEXT,
+      excluded_players TEXT DEFAULT ''
     )
   `);
+  // Migrate existing tables if columns missing
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS active INTEGER DEFAULT 1`);
+  await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS round_number TEXT`);
+  await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS excluded_players TEXT DEFAULT ''`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS predictions (
       id SERIAL PRIMARY KEY,
@@ -98,7 +105,7 @@ app.post("/add-player", async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT COUNT(*) as count FROM players");
     const position = parseInt(rows[0].count) + 1;
-    await pool.query("INSERT INTO players (name, order_position) VALUES ($1, $2)", [name.trim(), position]);
+    await pool.query("INSERT INTO players (name, order_position, active) VALUES ($1, $2, 1)", [name.trim(), position]);
     res.json({ success: true });
   } catch {
     res.status(400).json({ error: "Jugador ya existe" });
@@ -108,6 +115,28 @@ app.post("/add-player", async (req, res) => {
 app.get("/players", async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
   res.json(rows);
+});
+
+app.post("/deactivate-player", async (req, res) => {
+  const { player_id } = req.body;
+  if (!player_id) return res.status(400).json({ error: "ID requerido" });
+  try {
+    await pool.query("UPDATE players SET active = 0 WHERE id = $1", [player_id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/reactivate-player", async (req, res) => {
+  const { player_id } = req.body;
+  if (!player_id) return res.status(400).json({ error: "ID requerido" });
+  try {
+    await pool.query("UPDATE players SET active = 1 WHERE id = $1", [player_id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/reorder-players", async (req, res) => {
@@ -124,15 +153,16 @@ app.post("/reorder-players", async (req, res) => {
 
 // ===================== WEEKS =====================
 app.post("/new-week", async (req, res) => {
-  const { match, match_date } = req.body;
+  const { match, match_date, round_number, excluded_players } = req.body;
   if (!match?.trim()) return res.status(400).json({ error: "Partido inválido" });
   try {
     const { rows } = await pool.query("SELECT next_pot FROM weeks WHERE finished = 1 ORDER BY id DESC LIMIT 1");
     const pot = rows[0]?.next_pot || 0;
     const now = new Date().toLocaleString("es-ES", { timeZone: "Europe/Madrid" });
+    const excludedStr = Array.isArray(excluded_players) ? excluded_players.join(",") : (excluded_players || "");
     await pool.query(
-      "INSERT INTO weeks (match, match_date, created_at, pot, finished) VALUES ($1, $2, $3, $4, 0)",
-      [match.trim(), match_date || null, now, pot]
+      "INSERT INTO weeks (match, match_date, created_at, pot, finished, round_number, excluded_players) VALUES ($1, $2, $3, $4, 0, $5, $6)",
+      [match.trim(), match_date || null, now, pot, round_number || null, excludedStr]
     );
     res.json({ success: true });
   } catch (err) {
@@ -146,12 +176,13 @@ app.get("/current-week", async (req, res) => {
 });
 
 app.post("/edit-week", async (req, res) => {
-  const { week_id, match, match_date } = req.body;
+  const { week_id, match, match_date, round_number, excluded_players } = req.body;
   if (!week_id || !match?.trim()) return res.status(400).json({ error: "Datos inválidos" });
   try {
+    const excludedStr = Array.isArray(excluded_players) ? excluded_players.join(",") : (excluded_players || "");
     const { rowCount } = await pool.query(
-      "UPDATE weeks SET match = $1, match_date = $2 WHERE id = $3 AND finished = 0",
-      [match.trim(), match_date || null, week_id]
+      "UPDATE weeks SET match = $1, match_date = $2, round_number = $3, excluded_players = $4 WHERE id = $5 AND finished = 0",
+      [match.trim(), match_date || null, round_number || null, excludedStr, week_id]
     );
     if (rowCount === 0) return res.status(404).json({ error: "Semana no encontrada o ya cerrada" });
     await pool.query("DELETE FROM predictions WHERE week_id = $1", [week_id]);
@@ -184,8 +215,13 @@ app.post("/predict", async (req, res) => {
   const { week_id, player_id, result } = req.body;
   if (!week_id || !player_id || !result) return res.status(400).json({ error: "Datos incompletos" });
   try {
-    const { rows: players } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
-    if (!players.length) return res.status(400).json({ error: "No hay jugadores creados" });
+    const { rows: weekRows } = await pool.query("SELECT * FROM weeks WHERE id = $1", [week_id]);
+    if (!weekRows.length) return res.status(404).json({ error: "Semana no encontrada" });
+    const week = weekRows[0];
+    const excludedIds = week.excluded_players ? week.excluded_players.split(",").filter(Boolean).map(Number) : [];
+
+    const { rows: players } = await pool.query("SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC", [excludedIds.length ? excludedIds : [0]]);
+    if (!players.length) return res.status(400).json({ error: "No hay jugadores activos" });
     const { rows: preds } = await pool.query("SELECT * FROM predictions WHERE week_id = $1 ORDER BY id ASC", [week_id]);
     const expectedPlayer = players[preds.length % players.length].id;
     if (parseInt(player_id) !== expectedPlayer) return res.status(400).json({ error: "No es tu turno" });
@@ -208,9 +244,14 @@ app.post("/close-week", async (req, res) => {
     const { rows: weekRows } = await pool.query("SELECT * FROM weeks WHERE id = $1", [week_id]);
     if (!weekRows.length) return res.status(404).json({ message: "Semana no encontrada" });
     const week = weekRows[0];
+    const excludedIds = week.excluded_players ? week.excluded_players.split(",").filter(Boolean).map(Number) : [];
 
-    const { rows: countRows } = await pool.query("SELECT COUNT(*) as count FROM players");
-    const totalPlayers = parseInt(countRows[0].count);
+    // Only count active, non-excluded players for pot
+    const { rows: activePlayers } = await pool.query(
+      "SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC",
+      [excludedIds.length ? excludedIds : [0]]
+    );
+    const totalPlayers = activePlayers.length;
     const newPot = (week.pot || 0) + amountPerPerson * totalPlayers;
 
     const { rows: preds } = await pool.query("SELECT * FROM predictions WHERE week_id = $1", [week_id]);
@@ -223,14 +264,18 @@ app.post("/close-week", async (req, res) => {
       [real_result.trim(), amountPerPerson, newPot, nextPot, week_id]
     );
 
-    // Rotación: el primero pasa al último
-    const { rows: allPlayers } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
-    const newOrder = [...allPlayers.slice(1), allPlayers[0]];
+    // Rotación: solo entre jugadores activos no excluidos
+    const { rows: allActivePlayers } = await pool.query(
+      "SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC",
+      [excludedIds.length ? excludedIds : [0]]
+    );
+    const newOrder = [...allActivePlayers.slice(1), allActivePlayers[0]];
     for (let i = 0; i < newOrder.length; i++) {
       await pool.query("UPDATE players SET order_position = $1 WHERE id = $2", [i + 1, newOrder[i].id]);
     }
 
     if (hasWinner) {
+      const { rows: allPlayers } = await pool.query("SELECT * FROM players");
       const winnerNames = winners.map(w => allPlayers.find(p => p.id === w.player_id)?.name || "?").join(", ");
       res.json({ message: `✅ Semana cerrada. Acertaron: ${winnerNames}. Bote: ${newPot}€`, winners: winnerNames, pot: newPot });
     } else {
@@ -262,17 +307,85 @@ app.get("/history", async (req, res) => {
 // ===================== RANKINGS =====================
 app.get("/rankings", async (req, res) => {
   try {
-    const { rows } = await pool.query(`
-      SELECT p.id, p.name,
-        COUNT(pr.id) as total_predictions,
-        SUM(CASE WHEN pr.result = w.real_result AND w.finished = 1 THEN 1 ELSE 0 END) as wins,
-        SUM(CASE WHEN pr.result = w.real_result AND w.finished = 1 THEN w.pot ELSE 0 END) as money_won
-      FROM players p
-      LEFT JOIN predictions pr ON pr.player_id = p.id
-      LEFT JOIN weeks w ON w.id = pr.week_id
-      GROUP BY p.id ORDER BY wins DESC, money_won DESC
+    // Get all players (active and inactive for historical records)
+    const { rows: allPlayers } = await pool.query("SELECT * FROM players ORDER BY order_position ASC, id ASC");
+    // Get all finished weeks with excluded_players info
+    const { rows: finishedWeeks } = await pool.query("SELECT * FROM weeks WHERE finished = 1");
+    // Get all predictions with week result
+    const { rows: allPreds } = await pool.query(`
+      SELECT pr.*, w.real_result, w.pot, w.finished, w.excluded_players
+      FROM predictions pr
+      JOIN weeks w ON w.id = pr.week_id
+      WHERE w.finished = 1
     `);
+
+    const rankings = allPlayers.map(player => {
+      // Weeks where the player was NOT excluded and was active at the time
+      // (we approximate "active at time" as: they have a prediction OR they were not excluded)
+      const activeWeeks = finishedWeeks.filter(w => {
+        const excluded = w.excluded_players ? w.excluded_players.split(",").filter(Boolean).map(Number) : [];
+        return !excluded.includes(player.id);
+      });
+
+      const playerPreds = allPreds.filter(pr => pr.player_id === player.id);
+      const wins = playerPreds.filter(pr => pr.result === pr.real_result).length;
+      const moneyWon = playerPreds
+        .filter(pr => pr.result === pr.real_result)
+        .reduce((sum, pr) => sum + (parseInt(pr.pot) || 0), 0);
+
+      // total_predictions = weeks player actually participated (had a prediction)
+      const totalPredictions = playerPreds.length;
+
+      return {
+        id: player.id,
+        name: player.name,
+        active: player.active,
+        total_predictions: totalPredictions,
+        active_weeks: activeWeeks.length,
+        wins,
+        money_won: moneyWon
+      };
+    });
+
+    rankings.sort((a, b) => b.wins - a.wins || (b.money_won || 0) - (a.money_won || 0));
+    res.json(rankings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===================== PAYMENTS =====================
+app.get("/payments/:week_id", async (req, res) => {
+  try {
+    const { rows } = await pool.query(
+      "SELECT * FROM payments WHERE week_id = $1",
+      [req.params.week_id]
+    );
     res.json(rows);
+  } catch (err) {
+    // Table might not exist yet
+    res.json([]);
+  }
+});
+
+app.post("/payment-toggle", async (req, res) => {
+  const { week_id, player_id, paid } = req.body;
+  if (!week_id || !player_id) return res.status(400).json({ error: "Datos incompletos" });
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS payments (
+        id SERIAL PRIMARY KEY,
+        week_id INTEGER,
+        player_id INTEGER,
+        paid INTEGER DEFAULT 0,
+        UNIQUE(week_id, player_id)
+      )
+    `);
+    await pool.query(`
+      INSERT INTO payments (week_id, player_id, paid) VALUES ($1, $2, $3)
+      ON CONFLICT (week_id, player_id) DO UPDATE SET paid = $3
+    `, [week_id, player_id, paid ? 1 : 0]);
+    res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
