@@ -19,8 +19,8 @@
       <span class="logo-text">PORRA<span class="logo-sub">PLUS ELITE</span></span>
     </div>
     <div class="header-actions">
-      <button class="btn-admin-toggle" onclick="toggleAdmin()">⚙ Admin</button>
-      <button class="btn-logout" onclick="doLogout()">Salir</button>
+      <button type="button" class="btn-admin-toggle" onclick="toggleAdmin()">⚙ Admin</button>
+      <button type="button" class="btn-logout" onclick="doLogout()">Salir</button>
     </div>
   </div>
 </header>
@@ -49,7 +49,7 @@
         <span class="score-sep">—</span>
         <input type="number" id="resultVisit" min="0" max="99" placeholder="0" autocomplete="off">
       </div>
-      <button class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
+      <button type="button" class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
     </div>
   </section>
 
@@ -67,9 +67,9 @@
     <div class="card-header">
       <h2>🏆 Rankings</h2>
       <div class="tab-group">
-        <button class="tab active" onclick="switchTab('wins', event)">Victorias</button>
-        <button class="tab" onclick="switchTab('money', event)">Dinero</button>
-        <button class="tab" onclick="switchTab('rate', event)">Precisión</button>
+        <button type="button" class="tab active" onclick="switchTab('wins', event)">Victorias</button>
+        <button type="button" class="tab" onclick="switchTab('money', event)">Dinero</button>
+        <button type="button" class="tab" onclick="switchTab('rate', event)">Precisión</button>
       </div>
     </div>
     <div id="rankingsList" class="rankings-list"></div>
@@ -79,9 +79,18 @@
   <section class="card">
     <div class="card-header">
       <h2>📋 Historial</h2>
-      <button class="btn btn-sm" onclick="toggleHistory()">Ver más</button>
+      <button type="button" class="btn btn-sm" onclick="toggleHistory()">Ver más</button>
     </div>
     <div id="historyList" class="history-list hidden"></div>
+  </section>
+
+  <!-- 6. REGISTRO DETALLADO -->
+  <section class="card">
+    <div class="card-header">
+      <h2>📒 Registro de Semanas</h2>
+      <button type="button" class="btn btn-sm" onclick="toggleWeekLog()">Ver más</button>
+    </div>
+    <div id="weekLogList" class="weeklog-list hidden"></div>
   </section>
 
 </main>
@@ -92,7 +101,7 @@
 <aside class="admin-drawer" id="adminDrawer">
   <div class="drawer-header">
     <span class="drawer-title">⚙ Administración</span>
-    <button class="drawer-close" onclick="toggleAdmin()">✕</button>
+    <button type="button" class="drawer-close" onclick="toggleAdmin()">✕</button>
   </div>
   <div class="drawer-body">
 
@@ -103,7 +112,7 @@
         <input type="text" id="newMatch" placeholder="Ej: Real Madrid vs Barça">
         <input type="datetime-local" id="newMatchDate" title="Fecha y hora del partido (opcional)">
         <div id="newExcludeList" class="exclude-list"></div>
-        <button class="btn btn-blue" onclick="createWeek()">Crear Semana</button>
+        <button type="button" class="btn btn-blue" onclick="createWeek()">Crear Semana</button>
       </div>
     </div>
 
@@ -115,7 +124,7 @@
         <input type="datetime-local" id="editMatchDate" title="Nueva fecha y hora (opcional)">
         <div id="editExcludeList" class="exclude-list"></div>
         <div class="warn-note">⚠️ Se borrarán todas las apuestas actuales</div>
-        <button class="btn btn-amber" onclick="editWeek()">Guardar Cambios</button>
+        <button type="button" class="btn btn-amber" onclick="editWeek()">Guardar Cambios</button>
       </div>
     </div>
 
@@ -128,7 +137,7 @@
           <input type="number" id="realVisit" min="0" max="99" placeholder="0">
         </div>
         <input type="number" id="weeklyAmount" placeholder="€ por persona (por defecto 1€)" min="0">
-        <button class="btn btn-red" onclick="closeWeek()">Cerrar Semana</button>
+        <button type="button" class="btn btn-red" onclick="closeWeek()">Cerrar Semana</button>
       </div>
     </div>
 
@@ -136,7 +145,7 @@
       <h3>➕ Añadir Jugador</h3>
       <div class="input-col">
         <input type="text" id="newPlayerName" placeholder="Nombre del jugador">
-        <button class="btn btn-green" onclick="addPlayer()">Añadir</button>
+        <button type="button" class="btn btn-green" onclick="addPlayer()">Añadir</button>
       </div>
     </div>
 
@@ -148,19 +157,19 @@
     <div class="drawer-section">
       <h3>🔀 Reordenar Jugadores</h3>
       <div id="reorderList" class="reorder-list"></div>
-      <button class="btn btn-green" onclick="saveOrder()">Guardar Orden</button>
+      <button type="button" class="btn btn-green" onclick="saveOrder()">Guardar Orden</button>
     </div>
 
     <div class="drawer-section danger-section">
       <h3>🗑️ Eliminar Semana Actual</h3>
       <p class="warn-note">Elimina la semana activa y todas sus apuestas permanentemente.</p>
-      <button class="btn btn-red-outline" onclick="deleteWeek()">Eliminar Semana</button>
+      <button type="button" class="btn btn-red-outline" onclick="deleteWeek()">Eliminar Semana</button>
     </div>
 
     <div class="drawer-section backup-section">
       <h3>💾 Copia de Seguridad</h3>
       <div class="input-col">
-        <button class="btn btn-backup" onclick="exportData()">⬇️ Descargar copia (JSON)</button>
+        <button type="button" class="btn btn-backup" onclick="exportData()">⬇️ Descargar copia (JSON)</button>
         <label class="btn btn-backup" style="text-align:center;cursor:pointer;">
           ⬆️ Restaurar desde JSON
           <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
@@ -171,7 +180,7 @@
     <div class="drawer-section danger-section">
       <h3>☢️ Borrar Todos los Datos</h3>
       <p class="warn-note">Elimina jugadores, semanas y apuestas. Acción irreversible.</p>
-      <button class="btn btn-red-outline" onclick="resetAll()">Borrar todo</button>
+      <button type="button" class="btn btn-red-outline" onclick="resetAll()">Borrar todo</button>
     </div>
 
   </div>
@@ -187,8 +196,8 @@
     <div class="modal-title" id="modalTitle">¿Estás seguro?</div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-confirm" id="modalConfirmBtn">Confirmar</button>
+      <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
+      <button type="button" class="btn btn-confirm" id="modalConfirmBtn">Confirmar</button>
     </div>
   </div>
 </div>
