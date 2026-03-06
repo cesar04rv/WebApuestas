@@ -82,7 +82,13 @@ async function loadWeek() {
 
   // Jornada
   const roundEl = document.getElementById("weekRound");
-  roundEl.textContent = currentWeek.round_number ? currentWeek.round_number : "";
+  if (currentWeek.round_number) {
+    // If it already contains "JORNADA" show as-is, otherwise prefix it
+    const rn = currentWeek.round_number.toUpperCase();
+    roundEl.textContent = rn.startsWith("JORNADA") ? rn : `JORNADA ${rn}`;
+  } else {
+    roundEl.textContent = "";
+  }
 
   // Fecha del partido
   const dtEl = document.getElementById("weekDatetime");
@@ -537,7 +543,10 @@ async function loadHistory() {
       } catch(e) {}
     }
 
-    const roundStr = w.round_number ? `<span class="history-round">${w.round_number}</span>` : "";
+    const roundLabel = w.round_number
+      ? (w.round_number.toUpperCase().startsWith("JORNADA") ? w.round_number.toUpperCase() : `JORNADA ${w.round_number.toUpperCase()}`)
+      : "";
+    const roundStr = roundLabel ? `<span class="history-round">${roundLabel}</span>` : "";
 
     const div = document.createElement("div");
     div.className = "history-item";

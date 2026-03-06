@@ -56,14 +56,11 @@ body {
 
 .logo { display: flex; align-items: center; gap: 10px; }
 
-.logo-icon {
-  font-size: 24px;
-  animation: spin 8s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+.logo-img {
+  height: 40px;
+  width: 40px;
+  object-fit: contain;
+  border-radius: 6px;
 }
 
 .logo-text {
@@ -76,9 +73,9 @@ body {
 
 .logo-sub {
   display: block;
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-muted);
-  letter-spacing: 4px;
+  letter-spacing: 2px;
   font-family: 'Barlow Condensed', sans-serif;
   font-weight: 600;
 }
@@ -153,12 +150,13 @@ body {
 
 .scoreboard-round {
   font-family: 'Bebas Neue', cursive;
-  font-size: 16px;
-  letter-spacing: 4px;
+  font-size: clamp(22px, 4vw, 36px);
+  letter-spacing: 6px;
   color: var(--amber);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   position: relative;
-  min-height: 20px;
+  min-height: 36px;
+  text-shadow: 0 0 20px rgba(255,171,0,0.5);
 }
 
 .scoreboard-match {

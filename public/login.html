@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PorraIDS — Login</title>
+  <title>PorraPLUS ELITE — Login</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
   <style>
@@ -53,21 +53,18 @@
       margin-bottom: 32px;
     }
 
-    .login-ball {
-      font-size: 44px;
+    .login-img {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
       display: block;
-      margin-bottom: 8px;
-      animation: spin 8s linear infinite;
-    }
-
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
+      margin: 0 auto 12px;
+      border-radius: 10px;
     }
 
     .login-title {
       font-family: 'Bebas Neue', cursive;
-      font-size: 32px;
+      font-size: 36px;
       letter-spacing: 3px;
       color: #00c853;
       line-height: 1;
@@ -76,9 +73,9 @@
     .login-sub {
       font-family: 'Barlow Condensed', sans-serif;
       font-size: 11px;
-      letter-spacing: 4px;
+      letter-spacing: 3px;
       color: #6b7a99;
-      margin-top: 2px;
+      margin-top: 4px;
     }
 
     .field {
@@ -145,9 +142,9 @@
 <body>
   <div class="login-box">
     <div class="login-logo">
-      <span class="login-ball">⚽</span>
-      <div class="login-title">PORRA</div>
-      <div class="login-sub">IDS · ACCESO</div>
+      <img src="logo.jpeg" class="login-img" alt="PorraPLUS ELITE">
+      <div class="login-title">PORRA<span style="color:#ffab00">PLUS</span></div>
+      <div class="login-sub">ELITE · ACCESO</div>
     </div>
 
     <div class="field">
@@ -165,7 +162,6 @@
   </div>
 
   <script>
-    // Si ya está autenticado, redirigir
     fetch("/api/me").then(r => r.json()).then(d => {
       if (d.authenticated) window.location = "/";
     });
