@@ -225,9 +225,11 @@ app.post("/predict", async (req, res) => {
     const { rows: players } = await pool.query("SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC", [excludedIds.length ? excludedIds : [0]]);
     if (!players.length) return res.status(400).json({ error: "No hay jugadores activos" });
     const { rows: preds } = await pool.query("SELECT * FROM predictions WHERE week_id = $1 ORDER BY id ASC", [week_id]);
-    const expectedPlayer = players[preds.length % players.length].id;
-    if (parseInt(player_id) !== expectedPlayer) return res.status(400).json({ error: "No es tu turno" });
-    await pool.query("INSERT INTO predictions (week_id, player_id, result) VALUES ($1, $2, $3)", [week_id, player_id, result.trim()]);
+    const playerIdsWhoBet = new Set(preds.map(p => p.player_id));
+const nextPlayer = players.find(p => !playerIdsWhoBet.has(p.id));
+if (!nextPlayer) return res.status(400).json({ error: "Todos ya han apostado" });
+if (parseInt(player_id) !== nextPlayer.id)
+      await pool.query("INSERT INTO predictions (week_id, player_id, result) VALUES ($1, $2, $3)", [week_id, player_id, result.trim()]);
     res.json({ success: true });
   } catch {
     res.status(400).json({ error: "Resultado ya elegido o jugador ya apostó" });
