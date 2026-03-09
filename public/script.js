@@ -11,13 +11,23 @@ let newExcludedPlayers = [];
 let editExcludedPlayers = [];
 
 // ===================== INIT =====================
+let isRedirecting = false;
+
 (async () => {
-  const me = await api("/api/me").catch(() => null);
-  if (!me || !me.authenticated) {
-    window.location = "/login.html";
-    return;
+  try {
+    const me = await fetch("/api/me").then(r => r.json());
+    if (!me || !me.authenticated) {
+      if (!isRedirecting) {
+        isRedirecting = true;
+        window.location.replace("/login.html");
+      }
+      return;
+    }
+    loadData();
+  } catch(e) {
+    console.error("Error checking auth:", e);
+    // Don't redirect on network error, just show empty state
   }
-  loadData();
 })();
 
 async function loadData() {
@@ -38,7 +48,13 @@ async function loadData() {
 // ===================== FETCH =====================
 async function api(url, opts = {}) {
   const res = await fetch(url, opts);
-  if (res.status === 401) { window.location = "/login.html"; throw new Error("No autenticado"); }
+  if (res.status === 401) {
+    if (!isRedirecting) {
+      isRedirecting = true;
+      window.location.replace("/login.html");
+    }
+    throw new Error("No autenticado");
+  }
   return res.json();
 }
 
@@ -53,7 +69,7 @@ async function post(url, body) {
 // ===================== AUTH =====================
 async function doLogout() {
   await post("/api/logout", {});
-  window.location = "/login.html";
+  window.location.replace("/login.html");
 }
 
 // ===================== LOADERS =====================
@@ -137,15 +153,13 @@ function calculateTurn() {
     return;
   }
 
-  const allPlayed = activePlayers.every(p => predictions.find(pr => pr.player_id === p.id));
-  if (allPlayed) {
-    currentTurnPlayer = null;
+  const playerIdsWhoBet = new Set(predictions.map(pr => pr.player_id));
+  currentTurnPlayer = activePlayers.find(p => !playerIdsWhoBet.has(p.id)) || null;
+
+  if (!currentTurnPlayer) {
     document.getElementById("currentTurnName").textContent = "Todos han apostado";
     return;
   }
-
-  const turnIndex = predictions.length % activePlayers.length;
-  currentTurnPlayer = activePlayers[turnIndex];
   document.getElementById("currentTurnName").textContent = currentTurnPlayer.name.toUpperCase();
 }
 
@@ -176,7 +190,7 @@ function renderPlayers() {
       </div>
       ${currentWeek ? `
       <div class="player-payment">
-        <button class="btn-pay ${isPaid ? 'paid' : ''}" onclick="togglePayment(${p.id}, ${isPaid ? 1 : 0})" title="${isPaid ? 'Pagado ✓' : 'Marcar como pagado'}">
+        <button type="button" class="btn-pay ${isPaid ? 'paid' : ''}" onclick="togglePayment(${p.id}, ${isPaid ? 1 : 0})" title="${isPaid ? 'Pagado ✓' : 'Marcar como pagado'}">
           ${isPaid ? '✓ Pagado' : '€ Pagar'}
         </button>
       </div>` : ''}
@@ -259,6 +273,7 @@ function renderExcludeList(containerId, excludedArr, toggleFn) {
   activePlayers.forEach(p => {
     const excluded = excludedArr.includes(p.id);
     const btn = document.createElement("button");
+    btn.type = "button";
     btn.className = "btn-exclude" + (excluded ? " excluded" : "");
     btn.textContent = (excluded ? "✗ " : "") + p.name;
     btn.onclick = () => toggleFn(p.id);
@@ -283,8 +298,8 @@ function renderManagePlayers() {
     div.innerHTML = `
       <span class="manage-player-name">${p.name}${!p.active ? ' <span class="inactive-tag">inactivo</span>' : ''}</span>
       ${p.active
-        ? `<button class="btn-deactivate" onclick="deactivatePlayer(${p.id}, '${p.name}')">Desactivar</button>`
-        : `<button class="btn-reactivate" onclick="reactivatePlayer(${p.id}, '${p.name}')">Reactivar</button>`
+        ? `<button type="button" class="btn-deactivate" onclick="deactivatePlayer(${p.id}, '${p.name}')">Desactivar</button>`
+        : `<button type="button" class="btn-reactivate" onclick="reactivatePlayer(${p.id}, '${p.name}')">Reactivar</button>`
       }
     `;
     container.appendChild(div);
@@ -335,8 +350,8 @@ function renderReorder() {
     div.innerHTML = `
       <span class="reorder-pos">${i + 1}</span>
       <span class="reorder-name">${p.name}</span>
-      <button class="btn-move" onclick="moveUp(${p.id})">▲</button>
-      <button class="btn-move" onclick="moveDown(${p.id})">▼</button>
+      <button type="button" class="btn-move" onclick="moveUp(${p.id})">▲</button>
+      <button type="button" class="btn-move" onclick="moveDown(${p.id})">▼</button>
     `;
     container.appendChild(div);
   });
