@@ -769,9 +769,11 @@ async function loadWeekLog() {
       <div class="wl-header" onclick="this.parentElement.classList.toggle('open')">
         <div class="wl-header-left">
           ${roundLabel ? `<span class="wl-round">${roundLabel}</span>` : ""}
-          ${wlHome ? teamBadge(wlHome.slug, 20) : ""}
-          <span class="wl-match">${w.match}</span>
-          ${wlAway ? teamBadge(wlAway.slug, 20) : ""}
+          <span class="wl-match-row">
+            ${wlHome ? teamBadge(wlHome.slug, 18) : ""}
+            <span class="wl-match">${w.match}</span>
+            ${wlAway ? teamBadge(wlAway.slug, 18) : ""}
+          </span>
           ${matchDateStr ? `<span class="wl-date">${matchDateStr}</span>` : ""}
         </div>
         <div class="wl-header-right">
