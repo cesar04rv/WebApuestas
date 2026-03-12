@@ -109,8 +109,13 @@
     <div class="drawer-section">
       <h3>📅 Nueva Semana</h3>
       <div class="input-col">
+        <div class="team-selector-row">
+          <select id="newHomeTeam" class="team-select"></select>
+          <span class="score-sep">vs</span>
+          <select id="newAwayTeam" class="team-select"></select>
+        </div>
         <input type="text" id="newRound" placeholder="Jornada (ej: J28)">
-        <input type="text" id="newMatch" placeholder="Ej: Real Madrid vs Barça">
+        <input type="text" id="newMatch" placeholder="Ej: Real Madrid-Barça">
         <input type="datetime-local" id="newMatchDate" title="Fecha y hora del partido (opcional)">
         <div id="newExcludeList" class="exclude-list"></div>
         <button type="button" class="btn btn-blue" onclick="createWeek()">Crear Semana</button>
@@ -120,6 +125,11 @@
     <div class="drawer-section">
       <h3>✏️ Editar Partido Actual</h3>
       <div class="input-col">
+        <div class="team-selector-row">
+          <select id="editHomeTeam" class="team-select"></select>
+          <span class="score-sep">vs</span>
+          <select id="editAwayTeam" class="team-select"></select>
+        </div>
         <input type="text" id="editRound" placeholder="Jornada (ej: J28)">
         <input type="text" id="editMatch" placeholder="Nuevo nombre del partido">
         <input type="datetime-local" id="editMatchDate" title="Nueva fecha y hora (opcional)">
@@ -153,6 +163,18 @@
     <div class="drawer-section">
       <h3>👥 Gestionar Jugadores</h3>
       <div id="managePlayersList" class="manage-players-list"></div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>⚽ Gestión de Equipos</h3>
+      <div class="input-col">
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="text" id="newTeamSlug" placeholder="Acrónimo (ej: mad)" style="width:110px;flex-shrink:0">
+          <input type="text" id="newTeamName" placeholder="Nombre completo">
+          <button type="button" class="btn btn-green" style="flex-shrink:0" onclick="addTeam()">+</button>
+        </div>
+      </div>
+      <div id="manageTeamsList" style="margin-top:8px"></div>
     </div>
 
     <div class="drawer-section">
