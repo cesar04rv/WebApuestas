@@ -679,11 +679,18 @@ async function loadHistory() {
       : "";
     const roundStr = roundLabel ? `<span class="history-round">${roundLabel}</span>` : "";
 
+    const hHome = teams.find(t => t.id === w.home_team_id);
+    const hAway = teams.find(t => t.id === w.away_team_id);
     const div = document.createElement("div");
     div.className = "history-item";
     div.innerHTML = `
       <div>
-        <div class="history-match">${roundStr}${w.match}</div>
+        <div class="history-match">
+          ${roundStr}
+          ${hHome ? teamBadge(hHome.slug, 18) : ""}
+          ${w.match}
+          ${hAway ? teamBadge(hAway.slug, 18) : ""}
+        </div>
         <div class="history-meta">
           ${dateStr}${matchDateStr} · ${w.winners ? "🏆 " + w.winners : "Sin acertantes"}
         </div>
