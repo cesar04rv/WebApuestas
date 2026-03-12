@@ -143,7 +143,7 @@ async function loadTeams() {
 
 function teamBadge(slug, size = 28) {
   if (!slug) return "";
-  return `<img src="/logos/${slug}.svg" width="${size}" height="${size}" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
+  return `<img src="/Escudos/${slug}.svg" width="${size}" height="${size}" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
 }
 
 function renderTeamSelectors(homeId, awayId, homeVal, awayVal) {
@@ -152,9 +152,8 @@ function renderTeamSelectors(homeId, awayId, homeVal, awayVal) {
     const sel = document.getElementById(id);
     if (!sel) return;
     const val = idx === 0 ? homeVal : awayVal;
-    sel.innerHTML = `<option value="">— Local —</option>` +
+    sel.innerHTML = (idx === 0 ? `<option value="">— Local —</option>` : `<option value="">— Visitante —</option>`) +
       active.map(t => `<option value="${t.id}" ${t.id == val ? "selected" : ""}>${t.name}</option>`).join("");
-    if (idx === 1) sel.querySelector("option").textContent = "— Visitante —";
     sel.onchange = () => {
       const prefix = id.startsWith("new") ? "new" : "edit";
       const hId = parseInt(document.getElementById(prefix + "HomeTeam")?.value);
