@@ -77,16 +77,6 @@ async function initDB() {
       UNIQUE(week_id, player_id)
     )
   `);
-    await pool.query(`
-    CREATE TABLE IF NOT EXISTS teams (
-      id SERIAL PRIMARY KEY,
-      slug TEXT UNIQUE NOT NULL,
-      name TEXT NOT NULL,
-      active INTEGER DEFAULT 1
-    )
-  `);
-  await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS home_team_id INTEGER`);
-  await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS away_team_id INTEGER`);
   console.log("✅ Base de datos lista");
 }
 
@@ -165,7 +155,7 @@ app.post("/reorder-players", async (req, res) => {
 
 // ===================== WEEKS =====================
 app.post("/new-week", async (req, res) => {
-  const { match, match_date, round_number, excluded_players, home_team_id, away_team_id } = req.body;
+  const { match, match_date, round_number, excluded_players } = req.body;
   if (!match?.trim()) return res.status(400).json({ error: "Partido inválido" });
   try {
     const { rows } = await pool.query("SELECT next_pot FROM weeks WHERE finished = 1 ORDER BY id DESC LIMIT 1");
@@ -173,8 +163,8 @@ app.post("/new-week", async (req, res) => {
     const now = new Date().toLocaleString("es-ES", { timeZone: "Europe/Madrid" });
     const excludedStr = Array.isArray(excluded_players) ? excluded_players.join(",") : (excluded_players || "");
     await pool.query(
-      "INSERT INTO weeks (match, match_date, created_at, pot, finished, round_number, excluded_players, home_team_id, away_team_id) VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8)",
-      [match.trim(), match_date || null, now, pot, round_number || null, excludedStr, home_team_id || null, away_team_id || null]
+      "INSERT INTO weeks (match, match_date, created_at, pot, finished, round_number, excluded_players) VALUES ($1, $2, $3, $4, 0, $5, $6)",
+      [match.trim(), match_date || null, now, pot, round_number || null, excludedStr]
     );
     res.json({ success: true });
   } catch (err) {
@@ -188,13 +178,13 @@ app.get("/current-week", async (req, res) => {
 });
 
 app.post("/edit-week", async (req, res) => {
-  const { week_id, match, match_date, round_number, excluded_players, home_team_id, away_team_id } = req.body;
+  const { week_id, match, match_date, round_number, excluded_players } = req.body;
   if (!week_id || !match?.trim()) return res.status(400).json({ error: "Datos inválidos" });
   try {
     const excludedStr = Array.isArray(excluded_players) ? excluded_players.join(",") : (excluded_players || "");
     const { rowCount } = await pool.query(
-      "UPDATE weeks SET match = $1, match_date = $2, round_number = $3, excluded_players = $4, home_team_id = $5, away_team_id = $6 WHERE id = $7 AND finished = 0",
-      [match.trim(), match_date || null, round_number || null, excludedStr, home_team_id || null, away_team_id || null, week_id]
+      "UPDATE weeks SET match = $1, match_date = $2, round_number = $3, excluded_players = $4 WHERE id = $5 AND finished = 0",
+      [match.trim(), match_date || null, round_number || null, excludedStr, week_id]
     );
     if (rowCount === 0) return res.status(404).json({ error: "Semana no encontrada o ya cerrada" });
     await pool.query("DELETE FROM predictions WHERE week_id = $1", [week_id]);
@@ -401,6 +391,8 @@ app.get("/week-log", async (req, res) => {
         real_result: w.real_result,
         pot: w.pot,
         weekly_amount: w.weekly_amount,
+        home_team_id: w.home_team_id,
+        away_team_id: w.away_team_id,
         excluded: excludedNames,
         predictions: preds.map((pr, i) => ({
           order: i + 1,
@@ -459,8 +451,7 @@ app.get("/api/export", async (req, res) => {
     const { rows: players } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
     const { rows: weeks } = await pool.query("SELECT * FROM weeks ORDER BY id ASC");
     const { rows: predictions } = await pool.query("SELECT * FROM predictions ORDER BY id ASC");
-    const { rows: teams } = await pool.query("SELECT * FROM teams ORDER BY id ASC");
-    const backup = { exported_at: new Date().toISOString(), version: 1, players, weeks, predictions, teams };
+    const backup = { exported_at: new Date().toISOString(), version: 1, players, weeks, predictions };
     const filename = `porrids_backup_${new Date().toISOString().slice(0, 10)}.json`;
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     res.setHeader("Content-Type", "application/json");
@@ -471,38 +462,31 @@ app.get("/api/export", async (req, res) => {
 });
 
 app.post("/api/import", async (req, res) => {
-  const { players, weeks, predictions, teams } = req.body;
+  const { players, weeks, predictions } = req.body;
   if (!players || !weeks || !predictions) return res.status(400).json({ error: "JSON inválido: faltan datos" });
   try {
     await pool.query("DELETE FROM predictions");
     await pool.query("DELETE FROM weeks");
     await pool.query("DELETE FROM players");
-    await pool.query("DELETE FROM teams");
 
     for (const p of players) {
-      await pool.query("INSERT INTO players (id, name, order_position, active) VALUES ($1, $2, $3, $4)", [p.id, p.name, p.order_position, p.active ?? 1]);
+      await pool.query("INSERT INTO players (id, name, order_position) VALUES ($1, $2, $3)", [p.id, p.name, p.order_position]);
     }
     for (const w of weeks) {
       await pool.query(
-        "INSERT INTO weeks (id, match, match_date, created_at, real_result, pot, next_pot, weekly_amount, finished, round_number, excluded_players, home_team_id, away_team_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
-        [w.id, w.match, w.match_date || null, w.created_at || null, w.real_result || null, w.pot || 0, w.next_pot || 0, w.weekly_amount || 0, w.finished || 0, w.round_number || null, w.excluded_players || '', w.home_team_id || null, w.away_team_id || null]
+        "INSERT INTO weeks (id, match, match_date, created_at, real_result, pot, next_pot, weekly_amount, finished) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+        [w.id, w.match, w.match_date || null, w.created_at || null, w.real_result || null, w.pot || 0, w.next_pot || 0, w.weekly_amount || 0, w.finished || 0]
       );
     }
     for (const p of predictions) {
       await pool.query("INSERT INTO predictions (id, week_id, player_id, result) VALUES ($1, $2, $3, $4)", [p.id, p.week_id, p.player_id, p.result]);
-    }
-    if (teams?.length) {
-      for (const t of teams) {
-        await pool.query("INSERT INTO teams (id, slug, name, active) VALUES ($1, $2, $3, $4)", [t.id, t.slug, t.name, t.active ?? 1]);
-      }
-      await pool.query("SELECT setval('teams_id_seq', (SELECT MAX(id) FROM teams))");
     }
 
     await pool.query("SELECT setval('players_id_seq', (SELECT MAX(id) FROM players))");
     await pool.query("SELECT setval('weeks_id_seq', (SELECT MAX(id) FROM weeks))");
     await pool.query("SELECT setval('predictions_id_seq', (SELECT MAX(id) FROM predictions))");
 
-    res.json({ success: true, message: `Importados: ${players.length} jugadores, ${weeks.length} semanas, ${predictions.length} apuestas, ${teams?.length || 0} equipos` });
+    res.json({ success: true, message: `Importados: ${players.length} jugadores, ${weeks.length} semanas, ${predictions.length} apuestas` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -513,55 +497,9 @@ app.post("/api/reset", async (req, res) => {
     await pool.query("DELETE FROM predictions");
     await pool.query("DELETE FROM weeks");
     await pool.query("DELETE FROM players");
-    await pool.query("DELETE FROM teams");
     await pool.query("ALTER SEQUENCE players_id_seq RESTART WITH 1");
     await pool.query("ALTER SEQUENCE weeks_id_seq RESTART WITH 1");
     await pool.query("ALTER SEQUENCE predictions_id_seq RESTART WITH 1");
-    await pool.query("ALTER SEQUENCE teams_id_seq RESTART WITH 1");
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-// ===================== TEAMS =====================
-app.get("/teams", async (req, res) => {
-  try {
-    const { rows } = await pool.query("SELECT * FROM teams ORDER BY name ASC");
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/add-team", async (req, res) => {
-  const { slug, name } = req.body;
-  if (!slug?.trim() || !name?.trim()) return res.status(400).json({ error: "Datos inválidos" });
-  try {
-    await pool.query("INSERT INTO teams (slug, name, active) VALUES ($1, $2, 1)", [slug.trim().toLowerCase(), name.trim()]);
-    res.json({ success: true });
-  } catch {
-    res.status(400).json({ error: "Equipo ya existe" });
-  }
-});
-
-app.post("/deactivate-team", async (req, res) => {
-  const { team_id } = req.body;
-  if (!team_id) return res.status(400).json({ error: "ID requerido" });
-  try {
-    await pool.query("UPDATE teams SET active = 0 WHERE id = $1", [team_id]);
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-app.post("/reactivate-team", async (req, res) => {
-  const { team_id } = req.body;
-  if (!team_id) return res.status(400).json({ error: "ID requerido" });
-  try {
-    await pool.query("UPDATE teams SET active = 1 WHERE id = $1", [team_id]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
