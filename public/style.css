@@ -1036,3 +1036,23 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
   .wl-pred { grid-template-columns: 24px 1fr auto auto; gap: 8px; }
   .wl-header { flex-wrap: wrap; }
 }
+
+/* ── Teams ── */
+.team-selector-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.team-select {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--input-bg, #fff);
+  font-size: 0.9rem;
+  color: var(--text, #1e293b);
+}
+.team-select:focus {
+  outline: none;
+  border-color: var(--accent, #3b82f6);
+}
