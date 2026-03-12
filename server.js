@@ -401,6 +401,8 @@ app.get("/week-log", async (req, res) => {
         real_result: w.real_result,
         pot: w.pot,
         weekly_amount: w.weekly_amount,
+        home_team_id: w.home_team_id,
+        away_team_id: w.away_team_id,
         excluded: excludedNames,
         predictions: preds.map((pr, i) => ({
           order: i + 1,
