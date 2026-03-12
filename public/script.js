@@ -96,7 +96,12 @@ async function loadWeek() {
   const awayTeam = teams.find(t => t.id === currentWeek.away_team_id);
   const weekInfoEl = document.getElementById("weekInfo");
   if (homeTeam && awayTeam) {
-    weekInfoEl.innerHTML = `${teamBadge(homeTeam.slug, 32)} ${currentWeek.match} ${teamBadge(awayTeam.slug, 32)}`;
+    weekInfoEl.innerHTML = `
+      <span class="scoreboard-teams">
+        <img src="/Escudos/${homeTeam.slug}.svg" class="scoreboard-badge" onerror="this.style.display='none'">
+        <span class="scoreboard-vs">VS</span>
+        <img src="/Escudos/${awayTeam.slug}.svg" class="scoreboard-badge" onerror="this.style.display='none'">
+      </span>`;
   } else {
     weekInfoEl.textContent = currentWeek.match;
   }
@@ -769,11 +774,9 @@ async function loadWeekLog() {
       <div class="wl-header" onclick="this.parentElement.classList.toggle('open')">
         <div class="wl-header-left">
           ${roundLabel ? `<span class="wl-round">${roundLabel}</span>` : ""}
-          <span class="wl-match-row">
-            ${wlHome ? teamBadge(wlHome.slug, 18) : ""}
-            <span class="wl-match">${w.match}</span>
-            ${wlAway ? teamBadge(wlAway.slug, 18) : ""}
-          </span>
+          ${wlHome ? teamBadge(wlHome.slug, 20) : ""}
+          <span class="wl-match">${w.match}</span>
+          ${wlAway ? teamBadge(wlAway.slug, 20) : ""}
           ${matchDateStr ? `<span class="wl-date">${matchDateStr}</span>` : ""}
         </div>
         <div class="wl-header-right">

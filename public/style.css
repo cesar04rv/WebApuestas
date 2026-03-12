@@ -159,6 +159,27 @@ body {
   text-shadow: 0 0 20px rgba(255,171,0,0.5);
 }
 
+.scoreboard-teams {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.scoreboard-badge {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+}
+
+.scoreboard-vs {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 28px;
+  letter-spacing: 4px;
+  color: var(--text-muted);
+}
+
 .scoreboard-match {
   font-family: 'Bebas Neue', cursive;
   font-size: clamp(28px, 5vw, 52px);
@@ -891,13 +912,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
   font-size: 11px;
   letter-spacing: 3px;
   color: var(--amber);
-}
-
-.wl-match-row {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-width: 0;
 }
 
 .wl-match {
