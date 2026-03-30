@@ -821,9 +821,7 @@ function renderHistory(weeks) {
     div.onclick = () => div.classList.toggle("open");
     div.innerHTML = `
       <div class="history-header">
-        <div class="history-badge-left">
-          ${hHome ? '<img src="/Escudos/' + hHome.slug + '.svg" class="hist-badge" onerror="this.style.display='none'">' : '<div class="hist-badge-empty"></div>'}
-        </div>
+        <div class="history-badge-left">${hHome ? teamBadge(hHome.slug, 64) : '<div class="hist-badge-empty"></div>'}</div>
         <div class="history-center">
           ${roundStr ? '<div class="history-round-row">' + roundStr + '</div>' : ""}
           <div class="history-match-name">${w.match}</div>
@@ -836,9 +834,7 @@ function renderHistory(weeks) {
             ${dateStr}${matchDateStr} · ${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
           </div>
         </div>
-        <div class="history-badge-right">
-          ${hAway ? '<img src="/Escudos/' + hAway.slug + '.svg" class="hist-badge" onerror="this.style.display='none'">' : '<div class="hist-badge-empty"></div>'}
-        </div>
+        <div class="history-badge-right">${hAway ? teamBadge(hAway.slug, 64) : '<div class="hist-badge-empty"></div>'}</div>
       </div>
       <div class="history-body">
         <div class="hist-section-title">⚽ Apuestas · <span style="color:var(--text-muted);font-size:12px">${w.weekly_amount || 1}€/persona${excludedHTML ? " · " + w.excluded?.join(", ") + " no jugaron" : ""}</span></div>
