@@ -541,7 +541,8 @@ body {
   padding: 14px 18px;
 }
 .history-header:hover { background: rgba(255,255,255,0.03); border-radius: 10px; }
-.history-header-left { min-width: 0; }
+.history-header-left { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.history-round-row { display: flex; align-items: center; }
 .history-header-right { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
 .history-chevron { color: var(--text-muted); font-size: 14px; transition: transform 0.2s; }
 .history-accordion.open .history-chevron { transform: rotate(180deg); }

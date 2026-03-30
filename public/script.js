@@ -769,8 +769,8 @@ async function loadHistory() {
     div.innerHTML = `
       <div class="history-header" onclick="this.parentElement.classList.toggle('open')">
         <div class="history-header-left">
+          ${roundStr ? '<div class="history-round-row">' + roundStr + '</div>' : ""}
           <div class="history-match">
-            ${roundStr}
             ${hHome ? teamBadge(hHome.slug, 18) : ""}
             ${w.match}
             ${hAway ? teamBadge(hAway.slug, 18) : ""}
