@@ -472,6 +472,7 @@ body {
   text-transform: uppercase;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   flex-wrap: wrap;
 }
@@ -535,11 +536,13 @@ body {
 .history-accordion { padding: 0; cursor: pointer; }
 .history-header {
   padding: 14px 18px;
+  width: 100%;
 }
 .history-header:hover { background: rgba(255,255,255,0.03); border-radius: 10px; }
-.history-header-left { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.history-round-row { display: flex; align-items: center; }
-.history-result-row { display: flex; align-items: center; gap: 10px; }
+.history-header-left { width: 100%; display: flex; flex-direction: column; gap: 4px; align-items: center; text-align: center; }
+.history-round-row { display: flex; align-items: center; justify-content: center; }
+.history-result-row { display: flex; align-items: center; justify-content: center; gap: 10px; }
+
 .history-chevron { color: var(--text-muted); font-size: 14px; transition: transform 0.2s; }
 .history-accordion.open .history-chevron { transform: rotate(180deg); }
 .history-body {
