@@ -45,16 +45,8 @@ async function loadData() {
   renderManagePlayers();
   renderExcludeLists();
   await loadRankings();
-  await loadHistoryData();
+  await loadHistory();
   document.getElementById("playersCount").textContent = players.filter(p => p.active).length;
-  if (historyVisible) renderHistory(filterWeeksBySeason(allHistoryData));
-}
-
-async function loadHistoryData() {
-  const weeks = await api("/history");
-  allHistoryData = weeks || [];
-  renderSeasonFilter(allHistoryData);
-  renderRankingsFromWeeks(filterWeeksBySeason(allHistoryData));
 }
 
 // ===================== FETCH =====================
@@ -772,12 +764,12 @@ function applySeasonFilter() {
 }
 
 async function loadHistory() {
-  if (!allHistoryData.length) {
-    const weeks = await api("/history");
-    allHistoryData = weeks || [];
-    renderSeasonFilter(allHistoryData);
-    renderRankingsFromWeeks(filterWeeksBySeason(allHistoryData));
-  }
+  const weeks = await api("/history");
+  allHistoryData = weeks || [];
+  historyVisible = true;
+  document.getElementById("historyList")?.classList.remove("hidden");
+  renderSeasonFilter(allHistoryData);
+  renderRankingsFromWeeks(filterWeeksBySeason(allHistoryData));
   renderHistory(filterWeeksBySeason(allHistoryData));
 }
 
