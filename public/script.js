@@ -82,13 +82,20 @@ async function loadPlayers() {
 async function loadWeek() {
   currentWeek = await api("/current-week");
 
-  if (!currentWeek) {
+  if (!currentWeek || currentWeek.none) {
     document.getElementById("weekInfo").textContent = "Sin semana activa";
-    document.getElementById("potInfo").textContent = "";
     document.getElementById("weekDatetime").textContent = "";
     document.getElementById("weekStatus").textContent = "Crea una nueva semana desde Admin";
     document.getElementById("weekRound").textContent = "";
     document.getElementById("turnBanner").classList.add("hidden");
+    const pendingPot = currentWeek?.pending_pot || 0;
+    const potEl = document.getElementById("potInfo");
+    if (pendingPot > 0) {
+      potEl.innerHTML = `<span class="pot-pending">💰 Bote acumulado: <strong>${pendingPot}€</strong></span>`;
+    } else {
+      potEl.textContent = "";
+    }
+    currentWeek = null;
     return;
   }
 
@@ -189,6 +196,7 @@ function renderManageTeams() {
         ${!t.active ? '<span class="inactive-tag">inactivo</span>' : ""}
       </span>
       <div style="display:flex;gap:6px">
+        <button type="button" class="btn-move" onclick="startEditTeam(${t.id}, '${t.name}')" title="Editar nombre">✏️</button>
         ${t.active
           ? `<button type="button" class="btn-deactivate" onclick="deactivateTeam(${t.id}, '${t.name}')">Descender</button>`
           : `<button type="button" class="btn-reactivate" onclick="reactivateTeam(${t.id}, '${t.name}')">Ascender</button>`
@@ -227,6 +235,27 @@ async function deactivateTeam(id, name) {
       if (res.error) { toast(res.error, "error"); return; }
       toast(`${name} descendido`, "info");
       await loadTeams(); renderManageTeams();
+    }
+  });
+}
+
+function startEditTeam(id, currentName) {
+  showModal({
+    icon: "✏️",
+    title: "Editar nombre del equipo",
+    body: `<input type="text" id="editTeamNameInput" value="${currentName}" style="width:100%;margin-top:8px" placeholder="Nuevo nombre">`,
+    confirmText: "Guardar",
+    danger: false,
+    onConfirm: async () => {
+      const name = document.getElementById("editTeamNameInput")?.value.trim();
+      if (!name) return toast("El nombre no puede estar vacío", "error");
+      const res = await post("/edit-team", { team_id: id, name });
+      if (res.error) { toast(res.error, "error"); return; }
+      toast(`✓ Nombre actualizado`, "success");
+      await loadTeams();
+      renderManageTeams();
+      renderTeamSelectors("newHomeTeam", "newAwayTeam");
+      renderTeamSelectors("editHomeTeam", "editAwayTeam", currentWeek?.home_team_id, currentWeek?.away_team_id);
     }
   });
 }
@@ -708,22 +737,44 @@ async function loadHistory() {
 
     const hHome = teams.find(t => t.id === w.home_team_id);
     const hAway = teams.find(t => t.id === w.away_team_id);
+
+    // Payments
+    const payList = w.payments || [];
+    const paidCount = payList.filter(p => p.paid).length;
+    const paymentsHTML = payList.length
+      ? `<div class="history-payments">
+          ${payList.map(p => `
+            <span class="history-pay-badge ${p.paid ? 'paid' : 'unpaid'}">
+              ${p.paid ? '✓' : '✗'} ${p.name}
+            </span>`).join("")}
+         </div>`
+      : '<p class="empty-state" style="padding:6px 0;font-size:12px">Sin datos de pago</p>';
+
     const div = document.createElement("div");
-    div.className = "history-item";
+    div.className = "history-item history-accordion";
     div.innerHTML = `
-      <div>
-        <div class="history-match">
-          ${roundStr}
-          ${hHome ? teamBadge(hHome.slug, 18) : ""}
-          ${w.match}
-          ${hAway ? teamBadge(hAway.slug, 18) : ""}
+      <div class="history-header" onclick="this.parentElement.classList.toggle('open')">
+        <div class="history-header-left">
+          <div class="history-match">
+            ${roundStr}
+            ${hHome ? teamBadge(hHome.slug, 18) : ""}
+            ${w.match}
+            ${hAway ? teamBadge(hAway.slug, 18) : ""}
+          </div>
+          <div class="history-meta">
+            ${dateStr}${matchDateStr} · ${w.winners ? "🏆 " + w.winners : "Sin acertantes"}
+          </div>
         </div>
-        <div class="history-meta">
-          ${dateStr}${matchDateStr} · ${w.winners ? "🏆 " + w.winners : "Sin acertantes"}
+        <div class="history-header-right">
+          <div class="history-result">${w.real_result || "—"}</div>
+          <div class="history-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</div>
+          <span class="history-chevron">▾</span>
         </div>
       </div>
-      <div class="history-result">${w.real_result || "—"}</div>
-      <div class="history-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</div>
+      <div class="history-body">
+        <div class="history-pay-title">💶 Pagos (${paidCount}/${payList.length})</div>
+        ${paymentsHTML}
+      </div>
     `;
     container.appendChild(div);
   });

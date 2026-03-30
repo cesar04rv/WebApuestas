@@ -159,6 +159,26 @@ body {
   text-shadow: 0 0 20px rgba(255,171,0,0.5);
 }
 
+.pot-pending {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--amber);
+  letter-spacing: 0.5px;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.pot-pending strong {
+  font-size: 22px;
+  font-family: 'Bebas Neue', cursive;
+  letter-spacing: 2px;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+
 .scoreboard-teams {
   display: flex;
   align-items: center;
@@ -477,6 +497,47 @@ body {
 
 .history-result { font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 2px; color: var(--green); }
 .history-pot { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; color: var(--amber); font-size: 14px; text-align: right; }
+
+/* History accordion */
+.history-accordion { padding: 0; cursor: pointer; }
+.history-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+}
+.history-header:hover { background: rgba(255,255,255,0.03); border-radius: 10px; }
+.history-header-left { min-width: 0; }
+.history-header-right { display: flex; align-items: center; gap: 10px; }
+.history-chevron { color: var(--text-muted); font-size: 14px; transition: transform 0.2s; }
+.history-accordion.open .history-chevron { transform: rotate(180deg); }
+.history-body {
+  display: none;
+  padding: 0 18px 14px;
+  border-top: 1px solid var(--border);
+}
+.history-accordion.open .history-body { display: block; }
+.history-pay-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  padding-top: 10px;
+}
+.history-payments { display: flex; flex-wrap: wrap; gap: 6px; }
+.history-pay-badge {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+.history-pay-badge.paid { background: rgba(0,200,83,0.15); border: 1px solid rgba(0,200,83,0.3); color: var(--green); }
+.history-pay-badge.unpaid { background: rgba(244,67,54,0.1); border: 1px solid rgba(244,67,54,0.25); color: #f44336; }
 
 /* ===================== ADMIN DRAWER ===================== */
 .drawer-overlay {
