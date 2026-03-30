@@ -1247,3 +1247,34 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
 }
 .team-select:focus { border-color: var(--green); }
 .team-select option { background: var(--bg-card); color: var(--text); }
+/* ===================== SHARE / FIRMA ===================== */
+.scoreboard-firma {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+  height: 40px;
+  object-fit: contain;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+  z-index: 2;
+}
+.scoreboard-firma.visible { opacity: 1; }
+
+.btn-share {
+  background: linear-gradient(135deg, var(--green), var(--green-dark));
+  color: black;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 10px 28px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 20px rgba(0,200,83,0.25);
+}
+.btn-share:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,200,83,0.35); }
+.btn-share:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }

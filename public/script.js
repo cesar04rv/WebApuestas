@@ -328,8 +328,10 @@ function calculateTurn() {
 
   if (!currentTurnPlayer) {
     document.getElementById("currentTurnName").textContent = "Todos han apostado";
+    document.getElementById("shareContainer")?.classList.remove("hidden");
     return;
   }
+  document.getElementById("shareContainer")?.classList.add("hidden");
   document.getElementById("currentTurnName").textContent = currentTurnPlayer.name.toUpperCase();
 }
 
@@ -937,6 +939,53 @@ function renderRankings(data) {
     `;
     container.appendChild(div);
   });
+}
+
+
+// ===================== SHARE / CAPTURE =====================
+async function captureAndShare() {
+  const btn = document.querySelector(".btn-share");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Generando..."; }
+
+  // Show firma
+  const firma = document.getElementById("scoreboardFirma");
+  if (firma) firma.classList.add("visible");
+
+  // Elements to capture
+  const scoreboard = document.getElementById("scoreboard");
+  const playersCard = document.getElementById("playersList").closest(".card");
+
+  // Create wrapper
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = "background:#0a0e1a;padding:20px;display:flex;flex-direction:column;gap:20px;width:" + scoreboard.offsetWidth + "px;position:fixed;left:-9999px;top:0;";
+  wrapper.appendChild(scoreboard.cloneNode(true));
+  wrapper.appendChild(playersCard.cloneNode(true));
+  document.body.appendChild(wrapper);
+
+  try {
+    const canvas = await html2canvas(wrapper, {
+      backgroundColor: "#0a0e1a",
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      logging: false
+    });
+
+    // Download
+    const link = document.createElement("a");
+    link.download = "porra_" + (currentWeek?.match || "semana").replace(/[^a-z0-9]/gi, "_").toLowerCase() + ".png";
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+
+    toast("✓ Imagen descargada", "success");
+  } catch(err) {
+    toast("Error al generar imagen", "error");
+    console.error(err);
+  } finally {
+    document.body.removeChild(wrapper);
+    if (firma) firma.classList.remove("visible");
+    if (btn) { btn.disabled = false; btn.textContent = "📸 Compartir apuestas"; }
+  }
 }
 
 // ===================== ADMIN DRAWER =====================

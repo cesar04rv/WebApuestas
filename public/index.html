@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body>
 
@@ -30,6 +31,7 @@
 
   <!-- 1. SCOREBOARD -->
   <section class="scoreboard" id="scoreboard">
+    <img src="firma.png" class="scoreboard-firma" id="scoreboardFirma" alt="firma">
     <div class="scoreboard-label">PARTIDO DE LA SEMANA</div>
     <div class="scoreboard-round" id="weekRound"></div>
     <div class="scoreboard-match" id="weekInfo">Cargando...</div>
@@ -53,6 +55,11 @@
       <button type="button" class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
     </div>
   </section>
+
+  <!-- SHARE BUTTON -->
+  <div id="shareContainer" class="hidden" style="text-align:center;margin-top:-8px;">
+    <button type="button" class="btn btn-share" onclick="captureAndShare()">📸 Compartir apuestas</button>
+  </div>
 
   <!-- 3. JUGADORES -->
   <section class="card">
