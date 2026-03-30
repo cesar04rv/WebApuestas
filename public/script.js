@@ -509,50 +509,61 @@ async function reactivatePlayer(id, name) {
 }
 
 // ===================== RENDER REORDER =====================
+// Orden visual local (array de ids) — independiente de order_position en BD
+let reorderList = [];
+
 function renderReorder() {
   const container = document.getElementById("reorderList");
   container.innerHTML = "";
-  const activePlayers = players.filter(p => p.active).sort((a, b) => a.order_position - b.order_position);
 
-  activePlayers.forEach((p, i) => {
+  // Inicializar reorderList si está vacío o desactualizado
+  const activePlayers = players.filter(p => p.active);
+  if (!reorderList.length || !reorderList.every(id => activePlayers.find(p => p.id === id))) {
+    reorderList = [...activePlayers].sort((a, b) => a.order_position - b.order_position || a.id - b.id).map(p => p.id);
+  }
+
+  reorderList.forEach((id, i) => {
+    const p = players.find(pl => pl.id === id);
+    if (!p) return;
     const div = document.createElement("div");
     div.className = "reorder-item";
     div.innerHTML = `
       <span class="reorder-pos">${i + 1}</span>
       <span class="reorder-name">${p.name}</span>
-      <button type="button" class="btn-move" onclick="moveUp(${p.id})">▲</button>
-      <button type="button" class="btn-move" onclick="moveDown(${p.id})">▼</button>
+      <button type="button" class="btn-move" onclick="moveUp(${id})">▲</button>
+      <button type="button" class="btn-move" onclick="moveDown(${id})">▼</button>
     `;
     container.appendChild(div);
   });
 }
 
 function moveUp(id) {
-  const activePlayers = players.filter(p => p.active).sort((a, b) => a.order_position - b.order_position);
-  const index = activePlayers.findIndex(p => p.id === id);
+  const index = reorderList.indexOf(id);
   if (index > 0) {
-    [activePlayers[index].order_position, activePlayers[index - 1].order_position] =
-      [activePlayers[index - 1].order_position, activePlayers[index].order_position];
-    players.sort((a, b) => a.order_position - b.order_position);
-    renderReorder(); renderPlayers();
+    [reorderList[index], reorderList[index - 1]] = [reorderList[index - 1], reorderList[index]];
+    renderReorder();
   }
 }
 
 function moveDown(id) {
-  const activePlayers = players.filter(p => p.active).sort((a, b) => a.order_position - b.order_position);
-  const index = activePlayers.findIndex(p => p.id === id);
-  if (index < activePlayers.length - 1) {
-    [activePlayers[index].order_position, activePlayers[index + 1].order_position] =
-      [activePlayers[index + 1].order_position, activePlayers[index].order_position];
-    players.sort((a, b) => a.order_position - b.order_position);
-    renderReorder(); renderPlayers();
+  const index = reorderList.indexOf(id);
+  if (index < reorderList.length - 1) {
+    [reorderList[index], reorderList[index + 1]] = [reorderList[index + 1], reorderList[index]];
+    renderReorder();
   }
 }
 
 async function saveOrder() {
-  const orders = players.filter(p => p.active).map(p => ({ id: p.id, order_position: p.order_position }));
+  // Reasignar order_position consecutivos según el orden visual actual
+  const orders = reorderList.map((id, i) => ({ id, order_position: i + 1 }));
+  // Actualizar también el array local
+  orders.forEach(o => {
+    const p = players.find(pl => pl.id === o.id);
+    if (p) p.order_position = o.order_position;
+  });
   await post("/reorder-players", { orders });
   toast("Orden guardado ✓", "success");
+  reorderList = [];
   loadData();
 }
 
