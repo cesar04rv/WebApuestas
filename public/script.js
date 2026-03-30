@@ -737,18 +737,32 @@ async function loadHistory() {
 
     const hHome = teams.find(t => t.id === w.home_team_id);
     const hAway = teams.find(t => t.id === w.away_team_id);
+    const hasWinner = !!w.winners;
+
+    // Predictions
+    const predsHTML = w.predictions?.length
+      ? w.predictions.map(pr => `
+          <div class="hist-pred ${pr.correct ? "correct" : ""}">
+            <span class="hist-pred-order">#${pr.order}</span>
+            <span class="hist-pred-name">${pr.player_name}</span>
+            <span class="hist-pred-result">${pr.result}</span>
+            ${pr.correct ? '<span class="hist-pred-badge">&#10003;</span>' : ''}
+          </div>`).join("")
+      : '<p class="empty-state" style="padding:6px 0;font-size:12px">Nadie apost&#243;</p>';
+
+    // Excluded
+    const excludedHTML = w.excluded?.length
+      ? `<div class="hist-excluded">No jugaron: ${w.excluded.join(", ")}</div>`
+      : "";
 
     // Payments
     const payList = w.payments || [];
-    const paidCount = payList.filter(p => p.paid).length;
+    const paidCount = payList.filter(pay => pay.paid).length;
     const paymentsHTML = payList.length
-      ? `<div class="history-payments">
-          ${payList.map(p => `
-            <span class="history-pay-badge ${p.paid ? 'paid' : 'unpaid'}">
-              ${p.paid ? '✓' : '✗'} ${p.name}
-            </span>`).join("")}
-         </div>`
-      : '<p class="empty-state" style="padding:6px 0;font-size:12px">Sin datos de pago</p>';
+      ? '<div class="history-payments">' + payList.map(pay =>
+          '<span class="history-pay-badge ' + (pay.paid ? "paid" : "unpaid") + '">' + (pay.paid ? "&#10003;" : "&#10007;") + " " + pay.name + '</span>'
+        ).join("") + '</div>'
+      : "";
 
     const div = document.createElement("div");
     div.className = "history-item history-accordion";
@@ -762,115 +776,25 @@ async function loadHistory() {
             ${hAway ? teamBadge(hAway.slug, 18) : ""}
           </div>
           <div class="history-meta">
-            ${dateStr}${matchDateStr} · ${w.winners ? "🏆 " + w.winners : "Sin acertantes"}
+            ${dateStr}${matchDateStr} · ${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
           </div>
         </div>
         <div class="history-header-right">
-          <div class="history-result">${w.real_result || "—"}</div>
+          <div class="history-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</div>
           <div class="history-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</div>
           <span class="history-chevron">▾</span>
         </div>
       </div>
       <div class="history-body">
-        <div class="history-pay-title">💶 Pagos (${paidCount}/${payList.length})</div>
-        ${paymentsHTML}
+        <div class="hist-section-title">⚽ Apuestas · <span style="color:var(--text-muted);font-size:12px">${w.weekly_amount || 1}€/persona${excludedHTML ? " · " + w.excluded?.join(", ") + " no jugaron" : ""}</span></div>
+        <div class="hist-preds-grid">${predsHTML}</div>
+        ${payList.length ? `<div class="hist-section-title" style="margin-top:10px">💶 Pagos (${paidCount}/${payList.length})</div>${paymentsHTML}` : ""}
       </div>
     `;
     container.appendChild(div);
   });
 }
 
-// ===================== WEEK LOG =====================
-let weekLogVisible = false;
-
-async function toggleWeekLog() {
-  weekLogVisible = !weekLogVisible;
-  const container = document.getElementById("weekLogList");
-  const btn = document.querySelector('[onclick="toggleWeekLog()"]');
-  if (weekLogVisible) {
-    container.classList.remove("hidden");
-    if (btn) btn.textContent = "Ocultar";
-    loadWeekLog();
-  } else {
-    container.classList.add("hidden");
-    if (btn) btn.textContent = "Ver más";
-  }
-}
-
-async function loadWeekLog() {
-  const container = document.getElementById("weekLogList");
-  container.innerHTML = '<p class="empty-state">Cargando...</p>';
-  const weeks = await api("/week-log");
-
-  if (!weeks?.length) {
-    container.innerHTML = '<p class="empty-state">No hay semanas cerradas todavía.</p>';
-    return;
-  }
-
-  container.innerHTML = "";
-  weeks.forEach(w => {
-    const roundLabel = w.round_number
-      ? (w.round_number.toUpperCase().startsWith("JORNADA") ? w.round_number.toUpperCase() : `JORNADA ${w.round_number.toUpperCase()}`)
-      : "";
-
-    let matchDateStr = "";
-    if (w.match_date) {
-      try {
-        const d = new Date(w.match_date);
-        matchDateStr = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
-      } catch(e) {}
-    }
-
-    const hasWinner = w.predictions.some(p => p.correct);
-
-    // Build predictions rows
-    const predsHTML = w.predictions.length
-      ? w.predictions.map(p => `
-          <div class="wl-pred ${p.correct ? "correct" : ""}">
-            <span class="wl-pred-order">#${p.order}</span>
-            <span class="wl-pred-name">${p.player_name}</span>
-            <span class="wl-pred-result">${p.result}</span>
-            ${p.correct ? '<span class="wl-pred-badge">✓</span>' : ''}
-          </div>
-        `).join("")
-      : '<p class="empty-state" style="padding:8px 0">Nadie apostó esta semana</p>';
-
-    const excludedHTML = w.excluded?.length
-      ? `<div class="wl-excluded">No jugaron: ${w.excluded.join(", ")}</div>`
-      : "";
-
-    const wlHome = teams.find(t => t.id === w.home_team_id);
-    const wlAway = teams.find(t => t.id === w.away_team_id);
-    const div = document.createElement("div");
-    div.className = "weeklog-item";
-    div.innerHTML = `
-      <div class="wl-header" onclick="this.parentElement.classList.toggle('open')">
-        <div class="wl-header-left">
-          ${roundLabel ? `<span class="wl-round">${roundLabel}</span>` : ""}
-          ${wlHome ? teamBadge(wlHome.slug, 20) : ""}
-          <span class="wl-match">${w.match}</span>
-          ${wlAway ? teamBadge(wlAway.slug, 20) : ""}
-          ${matchDateStr ? `<span class="wl-date">${matchDateStr}</span>` : ""}
-        </div>
-        <div class="wl-header-right">
-          <span class="wl-real-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</span>
-          <span class="wl-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</span>
-          <span class="wl-chevron">▾</span>
-        </div>
-      </div>
-      <div class="wl-body">
-        <div class="wl-meta">
-          <span>💶 ${w.weekly_amount || 1}€ por persona</span>
-          ${excludedHTML}
-        </div>
-        <div class="wl-preds-grid">
-          ${predsHTML}
-        </div>
-      </div>
-    `;
-    container.appendChild(div);
-  });
-}
 
 // ===================== RANKINGS =====================
 async function loadRankings() {
