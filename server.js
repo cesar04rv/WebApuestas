@@ -325,7 +325,7 @@ app.get("/history", async (req, res) => {
       LEFT JOIN players p ON p.id = pr.player_id
       WHERE w.finished = 1
       GROUP BY w.id
-      ORDER BY w.id DESC LIMIT 30
+      ORDER BY w.id DESC LIMIT 50
     `);
 
     const { rows: allPlayers } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
@@ -335,8 +335,18 @@ app.get("/history", async (req, res) => {
       allPayments = rows;
     } catch {}
 
-    const result = weeks.map(w => {
+    const result = [];
+    for (const w of weeks) {
+      const { rows: preds } = await pool.query(`
+        SELECT pr.*, p.name as player_name
+        FROM predictions pr
+        JOIN players p ON p.id = pr.player_id
+        WHERE pr.week_id = $1
+        ORDER BY pr.id ASC
+      `, [w.id]);
+
       const excludedIds = w.excluded_players ? w.excluded_players.split(",").filter(Boolean).map(Number) : [];
+      const excludedNames = excludedIds.map(id => allPlayers.find(p => p.id === id)?.name).filter(Boolean);
       const activePlayers = allPlayers.filter(p => p.active && !excludedIds.includes(p.id));
       const weekPayments = allPayments.filter(p => p.week_id === w.id);
       const payments = activePlayers.map(p => ({
@@ -344,8 +354,19 @@ app.get("/history", async (req, res) => {
         name: p.name,
         paid: weekPayments.some(pay => pay.player_id === p.id && pay.paid)
       }));
-      return { ...w, payments };
-    });
+
+      result.push({
+        ...w,
+        predictions: preds.map((pr, i) => ({
+          order: i + 1,
+          player_name: pr.player_name,
+          result: pr.result,
+          correct: pr.result === w.real_result
+        })),
+        excluded: excludedNames,
+        payments
+      });
+    }
 
     res.json(result);
   } catch (err) {
@@ -403,55 +424,6 @@ app.get("/rankings", async (req, res) => {
   }
 });
 
-// ===================== WEEK DETAIL LOG =====================
-app.get("/week-log", async (req, res) => {
-  try {
-    const { rows: weeks } = await pool.query(
-      "SELECT * FROM weeks WHERE finished = 1 ORDER BY id DESC LIMIT 50"
-    );
-    const { rows: allPlayers } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
-
-    const result = [];
-    for (const w of weeks) {
-      const { rows: preds } = await pool.query(`
-        SELECT pr.*, p.name as player_name
-        FROM predictions pr
-        JOIN players p ON p.id = pr.player_id
-        WHERE pr.week_id = $1
-        ORDER BY pr.id ASC
-      `, [w.id]);
-
-      const excludedIds = w.excluded_players
-        ? w.excluded_players.split(",").filter(Boolean).map(Number)
-        : [];
-      const excludedNames = excludedIds
-        .map(id => allPlayers.find(p => p.id === id)?.name)
-        .filter(Boolean);
-
-      result.push({
-        id: w.id,
-        match: w.match,
-        round_number: w.round_number,
-        match_date: w.match_date,
-        real_result: w.real_result,
-        pot: w.pot,
-        weekly_amount: w.weekly_amount,
-        home_team_id: w.home_team_id,
-        away_team_id: w.away_team_id,
-        excluded: excludedNames,
-        predictions: preds.map((pr, i) => ({
-          order: i + 1,
-          player_name: pr.player_name,
-          result: pr.result,
-          correct: pr.result === w.real_result
-        }))
-      });
-    }
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
 
 // ===================== PAYMENTS =====================
 app.get("/payments/:week_id", async (req, res) => {
