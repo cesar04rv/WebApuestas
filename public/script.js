@@ -188,10 +188,13 @@ function renderManageTeams() {
         ${teamBadge(t.slug, 22)} ${t.name}
         ${!t.active ? '<span class="inactive-tag">inactivo</span>' : ""}
       </span>
-      ${t.active
-        ? `<button type="button" class="btn-deactivate" onclick="deactivateTeam(${t.id}, '${t.name}')">Descender</button>`
-        : `<button type="button" class="btn-reactivate" onclick="reactivateTeam(${t.id}, '${t.name}')">Ascender</button>`
-      }
+      <div style="display:flex;gap:6px">
+        ${t.active
+          ? `<button type="button" class="btn-deactivate" onclick="deactivateTeam(${t.id}, '${t.name}')">Descender</button>`
+          : `<button type="button" class="btn-reactivate" onclick="reactivateTeam(${t.id}, '${t.name}')">Ascender</button>`
+        }
+        <button type="button" class="btn-deactivate" onclick="deleteTeam(${t.id}, '${t.name}')" title="Eliminar definitivamente" style="background:rgba(244,67,54,0.15);border-color:rgba(244,67,54,0.4);color:#f44336">🗑</button>
+      </div>
     `;
     container.appendChild(div);
   });
@@ -240,6 +243,25 @@ async function reactivateTeam(id, name) {
       if (res.error) { toast(res.error, "error"); return; }
       toast(`${name} ascendido ✓`, "success");
       await loadTeams(); renderManageTeams();
+    }
+  });
+}
+
+async function deleteTeam(id, name) {
+  showModal({
+    icon: "🗑️",
+    title: "¿Eliminar equipo?",
+    body: `Se eliminará <strong>${name}</strong> definitivamente de la base de datos.<br><br>Los partidos que lo usaban quedarán sin escudo asignado.`,
+    confirmText: "Eliminar",
+    danger: true,
+    onConfirm: async () => {
+      const res = await post("/delete-team", { team_id: id });
+      if (res.error) { toast(res.error, "error"); return; }
+      toast(`${name} eliminado`, "info");
+      await loadTeams();
+      renderManageTeams();
+      renderTeamSelectors("newHomeTeam", "newAwayTeam");
+      renderTeamSelectors("editHomeTeam", "editAwayTeam", currentWeek?.home_team_id, currentWeek?.away_team_id);
     }
   });
 }

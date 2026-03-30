@@ -8,5 +8,24 @@
 Coger la Connection String y ponerla en un archivo .env de esta manera:
 DATABASE_URL = 'Connection String de Neon'
 8. Poner en el Render lo mismo que en el .env
+
+Para añadir un equipo descargar el svg de https://www.footylogos.com/es/competition/laliga
+
+guardarlo por sus 3 o 4 primeras letras
+(
+Barcelona-> bar.svg
+Real Madird -> mad.svg
+Vallladolid -> vall.svg
+Valencia ->val.svg
+) en la carpeta de public/Escudos
+
+
+
 DATABASE_URL = 'Connection String de Neon'
 
+CREATE TABLE teams (
+  id SERIAL PRIMARY KEY,
+  slug TEXT UNIQUE NOT NULL,  -- 'mad', 'bar', etc.
+  name TEXT NOT NULL,
+  active INTEGER DEFAULT 1
+)

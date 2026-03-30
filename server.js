@@ -570,6 +570,19 @@ app.post("/reactivate-team", async (req, res) => {
   }
 });
 
+app.post("/delete-team", async (req, res) => {
+  const { team_id } = req.body;
+  if (!team_id) return res.status(400).json({ error: "ID requerido" });
+  try {
+    await pool.query("UPDATE weeks SET home_team_id = NULL WHERE home_team_id = $1", [team_id]);
+    await pool.query("UPDATE weeks SET away_team_id = NULL WHERE away_team_id = $1", [team_id]);
+    await pool.query("DELETE FROM teams WHERE id = $1", [team_id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ===================== START =====================
 initDB().then(() => {
   app.listen(PORT, () => {
