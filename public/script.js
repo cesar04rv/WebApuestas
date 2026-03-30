@@ -690,20 +690,11 @@ async function closeWeek() {
   payments = [];
   toggleAdmin();
   loadData();
-  if (historyVisible) loadHistory();
+
 }
 
 // ===================== HISTORY =====================
-async function toggleHistory() {
-  historyVisible = !historyVisible;
-  const container = document.getElementById("historyList");
-  if (historyVisible) {
-    container.classList.remove("hidden");
-    loadHistory();
-  } else {
-    container.classList.add("hidden");
-  }
-}
+
 
 
 // ===================== SEASONS =====================
@@ -731,21 +722,18 @@ function renderSeasonFilter(weeks) {
   if (!container) return;
   container.innerHTML = "";
 
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.className = "season-btn" + (currentSeason === "all" ? " active" : "");
-  allBtn.textContent = "Todas";
-  allBtn.onclick = () => { currentSeason = "all"; applySeasonFilter(); };
-  container.appendChild(allBtn);
+  const label = document.createElement("span");
+  label.className = "season-label";
+  label.textContent = "⚽ Temporada:";
+  container.appendChild(label);
 
-  seasons.forEach(s => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "season-btn" + (currentSeason === s ? " active" : "");
-    btn.textContent = s;
-    btn.onclick = () => { currentSeason = s; applySeasonFilter(); };
-    container.appendChild(btn);
-  });
+  const sel = document.createElement("select");
+  sel.className = "season-select";
+  sel.innerHTML = '<option value="all">Todas</option>' +
+    seasons.map(s => '<option value="' + s + '"' + (currentSeason === s ? ' selected' : '') + '>' + s + '</option>').join("");
+  sel.value = currentSeason;
+  sel.onchange = () => { currentSeason = sel.value; applySeasonFilter(); };
+  container.appendChild(sel);
 }
 
 function filterWeeksBySeason(weeks) {
@@ -754,19 +742,14 @@ function filterWeeksBySeason(weeks) {
 }
 
 function applySeasonFilter() {
-  // Update season buttons
-  document.querySelectorAll(".season-btn").forEach(btn => {
-    btn.classList.toggle("active", btn.textContent === currentSeason || (currentSeason === "all" && btn.textContent === "Todas"));
-  });
-  // Re-render history and rankings with filter
-  renderHistory(filterWeeksBySeason(allHistoryData));
-  renderRankingsFromWeeks(filterWeeksBySeason(allHistoryData));
+  const filtered = filterWeeksBySeason(allHistoryData);
+  renderHistory(filtered);
+  renderRankingsFromWeeks(filtered);
 }
 
 async function loadHistory() {
   const weeks = await api("/history");
   allHistoryData = weeks || [];
-  historyVisible = true;
   document.getElementById("historyList")?.classList.remove("hidden");
   renderSeasonFilter(allHistoryData);
   renderRankingsFromWeeks(filterWeeksBySeason(allHistoryData));
