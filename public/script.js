@@ -775,14 +775,14 @@ async function loadHistory() {
             ${w.match}
             ${hAway ? teamBadge(hAway.slug, 18) : ""}
           </div>
+          <div class="history-result-row">
+            <span class="history-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</span>
+            ${w.pot ? '<span class="history-pot">💰 ' + w.pot + '€</span>' : ""}
+            <span class="history-chevron">▾</span>
+          </div>
           <div class="history-meta">
             ${dateStr}${matchDateStr} · ${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
           </div>
-        </div>
-        <div class="history-header-right">
-          <div class="history-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</div>
-          <div class="history-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</div>
-          <span class="history-chevron">▾</span>
         </div>
       </div>
       <div class="history-body">
