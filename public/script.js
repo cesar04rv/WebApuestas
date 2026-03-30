@@ -818,8 +818,9 @@ function renderHistory(weeks) {
 
     const div = document.createElement("div");
     div.className = "history-item history-accordion";
+    div.onclick = () => div.classList.toggle("open");
     div.innerHTML = `
-      <div class="history-header" onclick="this.parentElement.classList.toggle('open')">
+      <div class="history-header">
         <div class="history-header-left">
           ${roundStr ? '<div class="history-round-row">' + roundStr + '</div>' : ""}
           <div class="history-match">
