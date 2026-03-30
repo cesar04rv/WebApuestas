@@ -498,6 +498,39 @@ body {
 .history-result { font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 2px; color: var(--green); }
 .history-pot { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; color: var(--amber); font-size: 14px; text-align: right; }
 
+/* Hist predictions inside accordion */
+.hist-section-title {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  padding-top: 10px;
+  text-transform: uppercase;
+}
+.hist-preds-grid { display: flex; flex-direction: column; gap: 4px; }
+.hist-pred {
+  display: grid;
+  grid-template-columns: 28px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.03);
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+}
+.hist-pred.correct { background: rgba(0,200,83,0.08); border: 1px solid rgba(0,200,83,0.2); }
+.hist-pred-order { color: var(--text-muted); font-size: 12px; }
+.hist-pred-name { font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.hist-pred-result { font-family: 'Bebas Neue', cursive; font-size: 16px; letter-spacing: 1px; color: var(--text); }
+.hist-pred.correct .hist-pred-result { color: var(--green); }
+.hist-pred-badge { color: var(--green); font-weight: 700; font-size: 13px; }
+.hist-excluded { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-family: 'Barlow Condensed', sans-serif; }
+.history-result.winner { color: var(--green); }
+.history-result.no-winner { color: var(--red, #f44336); }
+
 /* History accordion */
 .history-accordion { padding: 0; cursor: pointer; }
 .history-header {
