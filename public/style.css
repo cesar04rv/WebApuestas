@@ -1156,36 +1156,37 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
 /* ===================== SEASON FILTER ===================== */
 .season-filter-bar {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   padding: 4px 0 12px;
 }
 
-.season-btn {
+.season-label {
   font-family: 'Barlow Condensed', sans-serif;
-  font-weight: 600;
   font-size: 13px;
+  font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
-  padding: 5px 14px;
-  border-radius: 20px;
-  border: 1px solid var(--border);
-  background: var(--bg-card2);
   color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.season-select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 7px 12px;
+  border-radius: 8px;
+  font-family: 'Barlow Condensed', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: border-color 0.2s;
 }
 
-.season-btn:hover {
-  border-color: var(--amber);
-  color: var(--amber);
-}
-
-.season-btn.active {
-  background: rgba(255,171,0,0.15);
-  border-color: var(--amber);
-  color: var(--amber);
-}
+.season-select:focus { border-color: var(--amber); }
+.season-select option { background: var(--bg-card); color: var(--text); }
 
 /* ── Teams ── */
 .team-selector-row {
