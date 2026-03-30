@@ -9,6 +9,7 @@ let currentTab = "wins";
 let payments = [];
 let newExcludedPlayers = [];
 let editExcludedPlayers = [];
+let teams = [];
 
 // ===================== INIT =====================
 let isRedirecting = false;
@@ -32,6 +33,7 @@ let isRedirecting = false;
 
 async function loadData() {
   await loadPlayers();
+  await loadTeams();
   await loadWeek();
   await loadPredictions();
   await loadPayments();
@@ -80,17 +82,36 @@ async function loadPlayers() {
 async function loadWeek() {
   currentWeek = await api("/current-week");
 
-  if (!currentWeek) {
+  if (!currentWeek || currentWeek.none) {
     document.getElementById("weekInfo").textContent = "Sin semana activa";
-    document.getElementById("potInfo").textContent = "";
     document.getElementById("weekDatetime").textContent = "";
     document.getElementById("weekStatus").textContent = "Crea una nueva semana desde Admin";
     document.getElementById("weekRound").textContent = "";
     document.getElementById("turnBanner").classList.add("hidden");
+    const pendingPot = currentWeek?.pending_pot || 0;
+    const potEl = document.getElementById("potInfo");
+    if (pendingPot > 0) {
+      potEl.innerHTML = `<span class="pot-pending">💰 Bote acumulado: <strong>${pendingPot}€</strong></span>`;
+    } else {
+      potEl.textContent = "";
+    }
+    currentWeek = null;
     return;
   }
 
-  document.getElementById("weekInfo").textContent = currentWeek.match;
+  const homeTeam = teams.find(t => t.id === currentWeek.home_team_id);
+  const awayTeam = teams.find(t => t.id === currentWeek.away_team_id);
+  const weekInfoEl = document.getElementById("weekInfo");
+  if (homeTeam && awayTeam) {
+    weekInfoEl.innerHTML = `
+      <span class="scoreboard-teams">
+        <img src="/Escudos/${homeTeam.slug}.svg" class="scoreboard-badge" onerror="this.style.display='none'">
+        <span class="scoreboard-vs">VS</span>
+        <img src="/Escudos/${awayTeam.slug}.svg" class="scoreboard-badge" onerror="this.style.display='none'">
+      </span>`;
+  } else {
+    weekInfoEl.textContent = currentWeek.match;
+  }
   document.getElementById("potInfo").textContent =
     currentWeek.pot > 0 ? `💰 Bote: ${currentWeek.pot} €` : "";
   document.getElementById("weekStatus").textContent = "SEMANA EN CURSO";
@@ -127,6 +148,153 @@ async function loadPayments() {
   payments = await api("/payments/" + currentWeek.id).catch(() => []);
 }
 
+// ===================== TEAMS =====================
+async function loadTeams() {
+  teams = await api("/teams");
+}
+
+function teamBadge(slug, size = 28) {
+  if (!slug) return "";
+  return `<img src="/Escudos/${slug}.svg" width="${size}" height="${size}" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
+}
+
+function renderTeamSelectors(homeId, awayId, homeVal, awayVal) {
+  const active = teams.filter(t => t.active);
+  [homeId, awayId].forEach((id, idx) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const val = idx === 0 ? homeVal : awayVal;
+    sel.innerHTML = (idx === 0 ? `<option value="">— Local —</option>` : `<option value="">— Visitante —</option>`) +
+      active.map(t => `<option value="${t.id}" ${t.id == val ? "selected" : ""}>${t.name}</option>`).join("");
+    sel.onchange = () => {
+      const prefix = id.startsWith("new") ? "new" : "edit";
+      const hId = parseInt(document.getElementById(prefix + "HomeTeam")?.value);
+      const aId = parseInt(document.getElementById(prefix + "AwayTeam")?.value);
+      const h = teams.find(t => t.id === hId);
+      const a = teams.find(t => t.id === aId);
+      const inp = document.getElementById(prefix + "Match");
+      if (inp && h && a) inp.value = `${h.name}-${a.name}`;
+    };
+  });
+}
+
+function renderManageTeams() {
+  const container = document.getElementById("manageTeamsList");
+  if (!container) return;
+  container.innerHTML = "";
+  if (!teams.length) {
+    container.innerHTML = '<p class="empty-state">No hay equipos.</p>';
+    return;
+  }
+  const sorted = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+  sorted.forEach(t => {
+    const div = document.createElement("div");
+    div.className = "manage-player-item" + (t.active ? "" : " inactive");
+    div.innerHTML = `
+      <span class="manage-player-name">
+        ${teamBadge(t.slug, 22)} ${t.name}
+        ${!t.active ? '<span class="inactive-tag">inactivo</span>' : ""}
+      </span>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="btn-move" onclick="startEditTeam(${t.id}, '${t.name}')" title="Editar nombre">✏️</button>
+        ${t.active
+          ? `<button type="button" class="btn-deactivate" onclick="deactivateTeam(${t.id}, '${t.name}')">Descender</button>`
+          : `<button type="button" class="btn-reactivate" onclick="reactivateTeam(${t.id}, '${t.name}')">Ascender</button>`
+        }
+        <button type="button" class="btn-deactivate" onclick="deleteTeam(${t.id}, '${t.name}')" title="Eliminar definitivamente" style="background:rgba(244,67,54,0.15);border-color:rgba(244,67,54,0.4);color:#f44336">🗑</button>
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function addTeam() {
+  const slug = document.getElementById("newTeamSlug")?.value.trim().toLowerCase();
+  const name = document.getElementById("newTeamName")?.value.trim();
+  if (!slug || !name) return toast("Rellena acrónimo y nombre", "error");
+  const res = await post("/add-team", { slug, name });
+  if (res.error) { toast(res.error, "error"); return; }
+  toast(`✓ ${name} añadido`, "success");
+  document.getElementById("newTeamSlug").value = "";
+  document.getElementById("newTeamName").value = "";
+  await loadTeams();
+  renderManageTeams();
+  renderTeamSelectors("newHomeTeam", "newAwayTeam");
+  renderTeamSelectors("editHomeTeam", "editAwayTeam", currentWeek?.home_team_id, currentWeek?.away_team_id);
+}
+
+async function deactivateTeam(id, name) {
+  showModal({
+    icon: "⬇️",
+    title: "¿Descender equipo?",
+    body: `<strong>${name}</strong> quedará inactivo. Puedes reactivarlo si sube.`,
+    confirmText: "Descender",
+    danger: true,
+    onConfirm: async () => {
+      const res = await post("/deactivate-team", { team_id: id });
+      if (res.error) { toast(res.error, "error"); return; }
+      toast(`${name} descendido`, "info");
+      await loadTeams(); renderManageTeams();
+    }
+  });
+}
+
+function startEditTeam(id, currentName) {
+  showModal({
+    icon: "✏️",
+    title: "Editar nombre del equipo",
+    body: `<input type="text" id="editTeamNameInput" value="${currentName}" style="width:100%;margin-top:8px" placeholder="Nuevo nombre">`,
+    confirmText: "Guardar",
+    danger: false,
+    onConfirm: async () => {
+      const name = document.getElementById("editTeamNameInput")?.value.trim();
+      if (!name) return toast("El nombre no puede estar vacío", "error");
+      const res = await post("/edit-team", { team_id: id, name });
+      if (res.error) { toast(res.error, "error"); return; }
+      toast(`✓ Nombre actualizado`, "success");
+      await loadTeams();
+      renderManageTeams();
+      renderTeamSelectors("newHomeTeam", "newAwayTeam");
+      renderTeamSelectors("editHomeTeam", "editAwayTeam", currentWeek?.home_team_id, currentWeek?.away_team_id);
+    }
+  });
+}
+
+async function reactivateTeam(id, name) {
+  showModal({
+    icon: "⬆️",
+    title: "¿Ascender equipo?",
+    body: `<strong>${name}</strong> volverá a estar disponible.`,
+    confirmText: "Ascender",
+    danger: false,
+    onConfirm: async () => {
+      const res = await post("/reactivate-team", { team_id: id });
+      if (res.error) { toast(res.error, "error"); return; }
+      toast(`${name} ascendido ✓`, "success");
+      await loadTeams(); renderManageTeams();
+    }
+  });
+}
+
+async function deleteTeam(id, name) {
+  showModal({
+    icon: "🗑️",
+    title: "¿Eliminar equipo?",
+    body: `Se eliminará <strong>${name}</strong> definitivamente de la base de datos.<br><br>Los partidos que lo usaban quedarán sin escudo asignado.`,
+    confirmText: "Eliminar",
+    danger: true,
+    onConfirm: async () => {
+      const res = await post("/delete-team", { team_id: id });
+      if (res.error) { toast(res.error, "error"); return; }
+      toast(`${name} eliminado`, "info");
+      await loadTeams();
+      renderManageTeams();
+      renderTeamSelectors("newHomeTeam", "newAwayTeam");
+      renderTeamSelectors("editHomeTeam", "editAwayTeam", currentWeek?.home_team_id, currentWeek?.away_team_id);
+    }
+  });
+}
+
 // ===================== EXCLUDED PLAYERS HELPERS =====================
 function getExcludedForCurrentWeek() {
   if (!currentWeek || !currentWeek.excluded_players) return [];
@@ -153,15 +321,13 @@ function calculateTurn() {
     return;
   }
 
-  const allPlayed = activePlayers.every(p => predictions.find(pr => pr.player_id === p.id));
-  if (allPlayed) {
-    currentTurnPlayer = null;
+  const playerIdsWhoBet = new Set(predictions.map(pr => pr.player_id));
+  currentTurnPlayer = activePlayers.find(p => !playerIdsWhoBet.has(p.id)) || null;
+
+  if (!currentTurnPlayer) {
     document.getElementById("currentTurnName").textContent = "Todos han apostado";
     return;
   }
-
-  const turnIndex = predictions.length % activePlayers.length;
-  currentTurnPlayer = activePlayers[turnIndex];
   document.getElementById("currentTurnName").textContent = currentTurnPlayer.name.toUpperCase();
 }
 
@@ -441,7 +607,9 @@ async function createWeek() {
   const match_date = document.getElementById("newMatchDate").value || null;
   const round_number = document.getElementById("newRound").value.trim() || null;
 
-  const data = await post("/new-week", { match, match_date, round_number, excluded_players: newExcludedPlayers });
+  const home_team_id = parseInt(document.getElementById("newHomeTeam")?.value) || null;
+  const away_team_id = parseInt(document.getElementById("newAwayTeam")?.value) || null;
+  const data = await post("/new-week", { match, match_date, round_number, excluded_players: newExcludedPlayers, home_team_id, away_team_id });
   if (data.error) { toast(data.error, "error"); return; }
   toast("✓ Semana creada", "success");
   document.getElementById("newMatch").value = "";
@@ -466,9 +634,11 @@ function editWeek() {
     confirmText: "Sí, editar y borrar apuestas",
     danger: true,
     onConfirm: async () => {
+      const home_team_id = parseInt(document.getElementById("editHomeTeam")?.value) || null;
+      const away_team_id = parseInt(document.getElementById("editAwayTeam")?.value) || null;
       const data = await post("/edit-week", {
         week_id: currentWeek.id, match, match_date, round_number,
-        excluded_players: editExcludedPlayers
+        excluded_players: editExcludedPlayers, home_team_id, away_team_id
       });
       if (data.error) { toast(data.error, "error"); return; }
       toast("✓ Partido actualizado y apuestas reiniciadas", "info");
@@ -565,109 +735,76 @@ async function loadHistory() {
       : "";
     const roundStr = roundLabel ? `<span class="history-round">${roundLabel}</span>` : "";
 
-    const div = document.createElement("div");
-    div.className = "history-item";
-    div.innerHTML = `
-      <div>
-        <div class="history-match">${roundStr}${w.match}</div>
-        <div class="history-meta">
-          ${dateStr}${matchDateStr} · ${w.winners ? "🏆 " + w.winners : "Sin acertantes"}
-        </div>
-      </div>
-      <div class="history-result">${w.real_result || "—"}</div>
-      <div class="history-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</div>
-    `;
-    container.appendChild(div);
-  });
-}
+    const hHome = teams.find(t => t.id === w.home_team_id);
+    const hAway = teams.find(t => t.id === w.away_team_id);
+    const hasWinner = !!w.winners;
 
-// ===================== WEEK LOG =====================
-let weekLogVisible = false;
-
-async function toggleWeekLog() {
-  weekLogVisible = !weekLogVisible;
-  const container = document.getElementById("weekLogList");
-  const btn = document.querySelector('[onclick="toggleWeekLog()"]');
-  if (weekLogVisible) {
-    container.classList.remove("hidden");
-    if (btn) btn.textContent = "Ocultar";
-    loadWeekLog();
-  } else {
-    container.classList.add("hidden");
-    if (btn) btn.textContent = "Ver más";
-  }
-}
-
-async function loadWeekLog() {
-  const container = document.getElementById("weekLogList");
-  container.innerHTML = '<p class="empty-state">Cargando...</p>';
-  const weeks = await api("/week-log");
-
-  if (!weeks?.length) {
-    container.innerHTML = '<p class="empty-state">No hay semanas cerradas todavía.</p>';
-    return;
-  }
-
-  container.innerHTML = "";
-  weeks.forEach(w => {
-    const roundLabel = w.round_number
-      ? (w.round_number.toUpperCase().startsWith("JORNADA") ? w.round_number.toUpperCase() : `JORNADA ${w.round_number.toUpperCase()}`)
-      : "";
-
-    let matchDateStr = "";
-    if (w.match_date) {
-      try {
-        const d = new Date(w.match_date);
-        matchDateStr = d.toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long" });
-      } catch(e) {}
-    }
-
-    const hasWinner = w.predictions.some(p => p.correct);
-
-    // Build predictions rows
-    const predsHTML = w.predictions.length
+    // Predictions
+    const predsHTML = w.predictions?.length
       ? w.predictions.map(p => `
-          <div class="wl-pred ${p.correct ? "correct" : ""}">
-            <span class="wl-pred-order">#${p.order}</span>
-            <span class="wl-pred-name">${p.player_name}</span>
-            <span class="wl-pred-result">${p.result}</span>
-            ${p.correct ? '<span class="wl-pred-badge">✓</span>' : ''}
-          </div>
-        `).join("")
-      : '<p class="empty-state" style="padding:8px 0">Nadie apostó esta semana</p>';
+          <div class="hist-pred ${p.correct ? "correct" : ""}">
+            <span class="hist-pred-order">#${p.order}</span>
+            <span class="hist-pred-name">${p.player_name}</span>
+            <span class="hist-pred-result">${p.result}</span>
+            ${p.correct ? '<span class="hist-pred-badge">✓</span>' : ''}
+          </div>`).join("")
+      : '<p class="empty-state" style="padding:6px 0;font-size:12px">Nadie apostó</p>';
 
+    // Excluded
     const excludedHTML = w.excluded?.length
-      ? `<div class="wl-excluded">No jugaron: ${w.excluded.join(", ")}</div>`
+      ? `<div class="hist-excluded">No jugaron: ${w.excluded.join(", ")}</div>`
+      : "";
+
+    // Payments
+    const payList = w.payments || [];
+    const paidCount = payList.filter(p => p.paid).length;
+    const paymentsHTML = payList.length
+      ? `<div class="history-payments">${payList.map(p => `
+          <span class="history-pay-badge ${p.paid ? "paid" : "unpaid"}">${p.paid ? "✓" : "✗"} ${p.name}</span>`).join("")}
+         </div>`
       : "";
 
     const div = document.createElement("div");
-    div.className = "weeklog-item";
-    div.innerHTML = `
-      <div class="wl-header" onclick="this.parentElement.classList.toggle('open')">
-        <div class="wl-header-left">
-          ${roundLabel ? `<span class="wl-round">${roundLabel}</span>` : ""}
-          <span class="wl-match">${w.match}</span>
-          ${matchDateStr ? `<span class="wl-date">${matchDateStr}</span>` : ""}
+    div.className = "history-item history-accordion";
+
+    // Header
+    const header = document.createElement("div");
+    header.className = "history-header";
+    header.innerHTML = `
+      <div class="history-header-left">
+        <div class="history-match">
+          ${roundStr}
+          ${hHome ? teamBadge(hHome.slug, 18) : ""}
+          ${w.match}
+          ${hAway ? teamBadge(hAway.slug, 18) : ""}
         </div>
-        <div class="wl-header-right">
-          <span class="wl-real-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</span>
-          <span class="wl-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</span>
-          <span class="wl-chevron">▾</span>
-        </div>
-      </div>
-      <div class="wl-body">
-        <div class="wl-meta">
-          <span>💶 ${w.weekly_amount || 1}€ por persona</span>
-          ${excludedHTML}
-        </div>
-        <div class="wl-preds-grid">
-          ${predsHTML}
+        <div class="history-meta">
+          ${dateStr}${matchDateStr} · ${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
         </div>
       </div>
+      <div class="history-header-right">
+        <div class="history-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</div>
+        <div class="history-pot">${w.pot ? "💰 " + w.pot + "€" : ""}</div>
+        <span class="history-chevron">▾</span>
+      </div>`;
+    header.addEventListener("click", () => div.classList.toggle("open"));
+
+    // Body
+    const body = document.createElement("div");
+    body.className = "history-body";
+    const excludedNote = w.excluded?.length ? " · " + w.excluded.join(", ") + " no jugaron" : "";
+    body.innerHTML = `
+      <div class="hist-section-title">⚽ Apuestas · <span style="color:var(--text-muted);font-size:12px">${w.weekly_amount || 1}€/persona${excludedNote}</span></div>
+      <div class="hist-preds-grid">${predsHTML}</div>
+      ${payList.length ? '<div class="hist-section-title" style="margin-top:10px">💶 Pagos (' + paidCount + '/' + payList.length + ')</div>' + paymentsHTML : ""}
     `;
+
+    div.appendChild(header);
+    div.appendChild(body);
     container.appendChild(div);
   });
 }
+
 
 // ===================== RANKINGS =====================
 async function loadRankings() {
@@ -752,6 +889,9 @@ function toggleAdmin() {
     }
     renderExcludeLists();
     renderManagePlayers();
+    renderManageTeams();
+    renderTeamSelectors("newHomeTeam", "newAwayTeam");
+    renderTeamSelectors("editHomeTeam", "editAwayTeam", currentWeek?.home_team_id, currentWeek?.away_team_id);
     drawer.classList.add("open");
     overlay.classList.remove("hidden");
     document.body.style.overflow = "hidden";
