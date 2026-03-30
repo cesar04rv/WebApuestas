@@ -1152,6 +1152,41 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
   .wl-header { flex-wrap: wrap; }
 }
 
+
+/* ===================== SEASON FILTER ===================== */
+.season-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 12px;
+}
+
+.season-btn {
+  font-family: 'Barlow Condensed', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-card2);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.season-btn:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.season-btn.active {
+  background: rgba(255,171,0,0.15);
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
 /* ── Teams ── */
 .team-selector-row {
   display: flex;

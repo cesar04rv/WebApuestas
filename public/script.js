@@ -5,7 +5,9 @@ let predictions = [];
 let currentTurnPlayer = null;
 let historyVisible = false;
 let rankingsData = [];
+let allHistoryData = [];
 let currentTab = "wins";
+let currentSeason = "all";
 let payments = [];
 let newExcludedPlayers = [];
 let editExcludedPlayers = [];
@@ -703,9 +705,74 @@ async function toggleHistory() {
   }
 }
 
+
+// ===================== SEASONS =====================
+function getSeason(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d)) return null;
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1; // 1-12
+  return month >= 8 ? `${year}/${year + 1}` : `${year - 1}/${year}`;
+}
+
+function getSeasons(weeks) {
+  const seasons = new Set();
+  weeks.forEach(w => {
+    const s = getSeason(w.match_date || w.created_at);
+    if (s) seasons.add(s);
+  });
+  return [...seasons].sort().reverse();
+}
+
+function renderSeasonFilter(weeks) {
+  const seasons = getSeasons(weeks);
+  const container = document.getElementById("seasonFilter");
+  if (!container) return;
+  container.innerHTML = "";
+
+  const allBtn = document.createElement("button");
+  allBtn.type = "button";
+  allBtn.className = "season-btn" + (currentSeason === "all" ? " active" : "");
+  allBtn.textContent = "Todas";
+  allBtn.onclick = () => { currentSeason = "all"; applySeasonFilter(); };
+  container.appendChild(allBtn);
+
+  seasons.forEach(s => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "season-btn" + (currentSeason === s ? " active" : "");
+    btn.textContent = s;
+    btn.onclick = () => { currentSeason = s; applySeasonFilter(); };
+    container.appendChild(btn);
+  });
+}
+
+function filterWeeksBySeason(weeks) {
+  if (currentSeason === "all") return weeks;
+  return weeks.filter(w => getSeason(w.match_date || w.created_at) === currentSeason);
+}
+
+function applySeasonFilter() {
+  // Update season buttons
+  document.querySelectorAll(".season-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.textContent === currentSeason || (currentSeason === "all" && btn.textContent === "Todas"));
+  });
+  // Re-render history and rankings with filter
+  renderHistory(filterWeeksBySeason(allHistoryData));
+  renderRankingsFromWeeks(filterWeeksBySeason(allHistoryData));
+}
+
 async function loadHistory() {
-  const container = document.getElementById("historyList");
   const weeks = await api("/history");
+  allHistoryData = weeks || [];
+  renderSeasonFilter(allHistoryData);
+  renderHistory(filterWeeksBySeason(allHistoryData));
+  renderRankingsFromWeeks(filterWeeksBySeason(allHistoryData));
+}
+
+function renderHistory(weeks) {
+  const container = document.getElementById("historyList");
 
   if (!weeks?.length) {
     container.innerHTML = '<p class="empty-state">No hay semanas cerradas todavía.</p>';
@@ -795,11 +862,30 @@ async function loadHistory() {
   });
 }
 
-
 // ===================== RANKINGS =====================
 async function loadRankings() {
   rankingsData = await api("/rankings");
   renderRankings();
+}
+
+function renderRankingsFromWeeks(weeks) {
+  // Recalculate rankings based on filtered weeks
+  const weekIds = new Set(weeks.map(w => w.id));
+  const filtered = rankingsData.map(player => {
+    // Filter predictions to only those in selected weeks
+    const wins = weeks.filter(w =>
+      w.predictions?.some(pr => pr.player_name === player.name && pr.correct)
+    ).length;
+    const moneyWon = weeks
+      .filter(w => w.predictions?.some(pr => pr.player_name === player.name && pr.correct))
+      .reduce((sum, w) => sum + (parseInt(w.pot) || 0), 0);
+    const totalPredictions = weeks.filter(w =>
+      w.predictions?.some(pr => pr.player_name === player.name)
+    ).length;
+    return { ...player, wins, money_won: moneyWon, total_predictions: totalPredictions };
+  });
+  filtered.sort((a, b) => b.wins - a.wins || (b.money_won || 0) - (a.money_won || 0));
+  renderRankings(filtered);
 }
 
 function switchTab(tab, e) {
@@ -809,21 +895,22 @@ function switchTab(tab, e) {
   renderRankings();
 }
 
-function renderRankings() {
+function renderRankings(data) {
   const container = document.getElementById("rankingsList");
+  const displayData = data || rankingsData;
 
-  if (!rankingsData.length) {
+  if (!displayData.length) {
     container.innerHTML = '<p class="empty-state">Aún no hay datos de ranking.</p>';
     return;
   }
 
   let sorted;
   if (currentTab === "wins") {
-    sorted = [...rankingsData].sort((a, b) => b.wins - a.wins);
+    sorted = [...displayData].sort((a, b) => b.wins - a.wins);
   } else if (currentTab === "money") {
-    sorted = [...rankingsData].sort((a, b) => (b.money_won || 0) - (a.money_won || 0));
+    sorted = [...displayData].sort((a, b) => (b.money_won || 0) - (a.money_won || 0));
   } else {
-    sorted = [...rankingsData].sort((a, b) => {
+    sorted = [...displayData].sort((a, b) => {
       const rA = a.total_predictions > 0 ? a.wins / a.total_predictions : 0;
       const rB = b.total_predictions > 0 ? b.wins / b.total_predictions : 0;
       return rB - rA;
