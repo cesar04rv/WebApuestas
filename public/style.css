@@ -1250,14 +1250,16 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
 /* ===================== SHARE / FIRMA ===================== */
 .scoreboard-firma {
   position: absolute;
-  top: 16px;
-  right: 20px;
-  height: 40px;
+  top: 50%;
+  right: 24px;
+  transform: translateY(-50%);
+  height: 50%;
+  max-height: 50%;
   object-fit: contain;
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.3s;
-  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4));
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
   z-index: 2;
 }
 .scoreboard-firma.visible { opacity: 1; }
