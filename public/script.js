@@ -821,13 +821,12 @@ function renderHistory(weeks) {
     div.onclick = () => div.classList.toggle("open");
     div.innerHTML = `
       <div class="history-header">
-        <div class="history-header-left">
+        <div class="history-badge-left">
+          ${hHome ? '<img src="/Escudos/' + hHome.slug + '.svg" class="hist-badge" onerror="this.style.display='none'">' : '<div class="hist-badge-empty"></div>'}
+        </div>
+        <div class="history-center">
           ${roundStr ? '<div class="history-round-row">' + roundStr + '</div>' : ""}
-          <div class="history-match">
-            ${hHome ? teamBadge(hHome.slug, 18) : ""}
-            ${w.match}
-            ${hAway ? teamBadge(hAway.slug, 18) : ""}
-          </div>
+          <div class="history-match-name">${w.match}</div>
           <div class="history-result-row">
             <span class="history-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</span>
             ${w.pot ? '<span class="history-pot">💰 ' + w.pot + '€</span>' : ""}
@@ -836,6 +835,9 @@ function renderHistory(weeks) {
           <div class="history-meta">
             ${dateStr}${matchDateStr} · ${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
           </div>
+        </div>
+        <div class="history-badge-right">
+          ${hAway ? '<img src="/Escudos/' + hAway.slug + '.svg" class="hist-badge" onerror="this.style.display='none'">' : '<div class="hist-badge-empty"></div>'}
         </div>
       </div>
       <div class="history-body">
