@@ -407,6 +407,12 @@ app.get("/rankings", async (req, res) => {
       // total_predictions = weeks player actually participated (had a prediction)
       const totalPredictions = playerPreds.length;
 
+      // money_spent = sum of weekly_amount for each week the player bet
+      const moneySpent = playerPreds.reduce((sum, pr) => {
+        const week = finishedWeeks.find(w => w.id === pr.week_id);
+        return sum + (parseInt(week?.weekly_amount) || 1);
+      }, 0);
+
       return {
         id: player.id,
         name: player.name,
@@ -414,7 +420,8 @@ app.get("/rankings", async (req, res) => {
         total_predictions: totalPredictions,
         active_weeks: activeWeeks.length,
         wins,
-        money_won: moneyWon
+        money_won: moneyWon,
+        money_spent: moneySpent
       };
     });
 
