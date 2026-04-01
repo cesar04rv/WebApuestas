@@ -994,8 +994,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
   .turn-banner { flex-direction: column; align-items: flex-start; }
   .turn-form { width: 100%; }
   .turn-form input { flex: 1; }
-  .history-item { grid-template-columns: 1fr auto; }
-  .history-pot { grid-column: 1 / -1; }
   .players-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 }
 
