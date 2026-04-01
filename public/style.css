@@ -454,50 +454,14 @@ body {
 /* ===================== HISTORY ===================== */
 .history-list { display: flex; flex-direction: column; gap: 10px; }
 
-.history-item {
-  background: var(--bg-card2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 14px 18px;
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  align-items: center;
-  gap: 12px;
-}
+/* Esta definición antigua de history-item ha sido eliminada - ver línea 539 para la versión correcta */
 
-.history-match {
-  font-family: 'Barlow Condensed', sans-serif;
-  font-weight: 700;
-  font-size: 15px;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
 
-.history-round {
-  font-family: 'Bebas Neue', cursive;
-  font-size: 13px;
-  letter-spacing: 2px;
-  color: var(--amber);
-  background: rgba(255,171,0,0.1);
-  border: 1px solid rgba(255,171,0,0.25);
-  padding: 2px 7px;
-  border-radius: 4px;
-}
-
-.history-meta {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 3px;
-  font-family: 'Barlow Condensed', sans-serif;
-  letter-spacing: 0.3px;
-}
+/* Estilos obsoletos eliminados - ahora se usan history-round-row, history-match-name, etc. */
 
 .history-result { font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 2px; color: var(--green); }
-.history-pot { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; color: var(--amber); font-size: 14px; text-align: right; }
+.history-pot { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; color: var(--amber); font-size: 14px; }
+
 
 /* Hist predictions inside accordion */
 .hist-section-title {
@@ -1043,8 +1007,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
   .turn-banner { flex-direction: column; align-items: flex-start; }
   .turn-form { width: 100%; }
   .turn-form input { flex: 1; }
-  .history-item { grid-template-columns: 1fr auto; }
-  .history-pot { grid-column: 1 / -1; }
   .players-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
 }
 
