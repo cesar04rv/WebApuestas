@@ -318,6 +318,13 @@ app.post("/close-week", async (req, res) => {
 // ===================== HISTORY =====================
 app.get("/history", async (req, res) => {
   try {
+    const limit = parseInt(req.query.limit) || 5;
+    const offset = parseInt(req.query.offset) || 0;
+
+    // Get total count for frontend pagination
+    const { rows: countRows } = await pool.query("SELECT COUNT(*) as total FROM weeks WHERE finished = 1");
+    const total = parseInt(countRows[0].total);
+
     const { rows: weeks } = await pool.query(`
       SELECT w.*, STRING_AGG(DISTINCT p.name, ',') as winners
       FROM weeks w
@@ -325,8 +332,9 @@ app.get("/history", async (req, res) => {
       LEFT JOIN players p ON p.id = pr.player_id
       WHERE w.finished = 1
       GROUP BY w.id
-      ORDER BY w.id DESC LIMIT 50
-    `);
+      ORDER BY w.id DESC
+      LIMIT $1 OFFSET $2
+    `, [limit, offset]);
 
     const { rows: allPlayers } = await pool.query("SELECT * FROM players ORDER BY order_position ASC");
     let allPayments = [];
@@ -369,7 +377,7 @@ app.get("/history", async (req, res) => {
       });
     }
 
-    res.json(result);
+    res.json({ weeks: result, total, offset, limit });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
