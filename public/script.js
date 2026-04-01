@@ -189,7 +189,7 @@ function renderManageTeams() {
     container.innerHTML = '<p class="empty-state">No hay equipos.</p>';
     return;
   }
-  const sorted = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+  const sorted = [...teams].sort((a, b) => (b.active - a.active) || a.name.localeCompare(b.name));
   sorted.forEach(t => {
     const div = document.createElement("div");
     div.className = "manage-player-item" + (t.active ? "" : " inactive");
@@ -465,7 +465,8 @@ function renderManagePlayers() {
     return;
   }
 
-  players.forEach(p => {
+  const sortedPlayers = [...players].sort((a, b) => (b.active - a.active) || a.order_position - b.order_position || a.id - b.id);
+  sortedPlayers.forEach(p => {
     const div = document.createElement("div");
     div.className = "manage-player-item" + (p.active ? "" : " inactive");
     div.innerHTML = `
@@ -921,12 +922,11 @@ function renderRankings(data) {
   sorted.forEach((p, i) => {
     const rate = p.total_predictions > 0 ? ((p.wins / p.total_predictions) * 100).toFixed(0) : 0;
     const displayValue = currentTab === "wins" ? p.wins : currentTab === "money" ? (p.money_won || 0) + "€" : rate + "%";
-    const spent = p.money_spent || 0;
     const subText = currentTab === "wins"
-      ? `${p.money_won || 0}€ ganados · ${rate}% acierto · ${p.total_predictions} apuestas · ${spent}€ invertidos`
+      ? `${p.money_won || 0}€ ganados · ${rate}% acierto · ${p.total_predictions} apuestas`
       : currentTab === "money"
-      ? `${p.wins} victorias · ${rate}% acierto · ${spent}€ invertidos`
-      : `${p.wins} victorias · ${p.total_predictions} apuestas · ${spent}€ invertidos`;
+      ? `${p.wins} victorias · ${rate}% acierto`
+      : `${p.wins} victorias · ${p.total_predictions} apuestas`;
 
     const div = document.createElement("div");
     div.className = "ranking-item" + (p.active == 0 ? " inactive-player" : "");

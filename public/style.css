@@ -1280,3 +1280,26 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
 }
 .btn-share:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,200,83,0.35); }
 .btn-share:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+/* ===================== DRAWER GROUPS ===================== */
+.drawer-group { border-bottom: 1px solid var(--border); }
+.drawer-group:last-child { border-bottom: none; }
+.drawer-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  cursor: pointer;
+  font-family: 'Bebas Neue', cursive;
+  font-size: 16px;
+  letter-spacing: 2px;
+  color: var(--text-muted);
+  transition: color 0.2s, background 0.2s;
+  user-select: none;
+}
+.drawer-group-header:hover { color: var(--text); background: rgba(255,255,255,0.02); }
+.drawer-group-header.danger { color: rgba(244,67,54,0.7); }
+.drawer-group-header.danger:hover { color: var(--red); }
+.drawer-group-chevron { font-size: 14px; transition: transform 0.25s; color: var(--text-muted); }
+.drawer-group.open .drawer-group-chevron { transform: rotate(180deg); }
+.drawer-group-body { display: none; border-top: 1px solid var(--border); }
+.drawer-group.open .drawer-group-body { display: block; }
