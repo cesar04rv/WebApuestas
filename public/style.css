@@ -469,6 +469,13 @@ body {
   border-radius: 4px;
 }
 
+.history-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'Barlow Condensed', sans-serif;
+  letter-spacing: 0.3px;
+}
+
 .history-result { font-family: 'Bebas Neue', cursive; font-size: 22px; letter-spacing: 2px; color: var(--green); }
 .history-pot { font-family: 'Barlow Condensed', sans-serif; font-weight: 600; color: var(--amber); font-size: 14px; }
 
