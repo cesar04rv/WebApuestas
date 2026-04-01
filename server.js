@@ -347,9 +347,10 @@ app.get("/history", async (req, res) => {
 
       const excludedIds = w.excluded_players ? w.excluded_players.split(",").filter(Boolean).map(Number) : [];
       const excludedNames = excludedIds.map(id => allPlayers.find(p => p.id === id)?.name).filter(Boolean);
-      const activePlayers = allPlayers.filter(p => p.active && !excludedIds.includes(p.id));
       const weekPayments = allPayments.filter(p => p.week_id === w.id);
-      const payments = activePlayers.map(p => ({
+      // Only show payments for players who actually bet this week
+      const playersWhoBet = preds.map(pr => ({ id: pr.player_id, name: pr.player_name }));
+      const payments = playersWhoBet.map(p => ({
         player_id: p.id,
         name: p.name,
         paid: weekPayments.some(pay => pay.player_id === p.id && pay.paid)
@@ -406,12 +407,6 @@ app.get("/rankings", async (req, res) => {
       // total_predictions = weeks player actually participated (had a prediction)
       const totalPredictions = playerPreds.length;
 
-      // money_spent = sum of weekly_amount for each week the player bet
-      const moneySpent = playerPreds.reduce((sum, pr) => {
-        const week = finishedWeeks.find(w => w.id === pr.week_id);
-        return sum + (parseInt(week?.weekly_amount) || 1);
-      }, 0);
-
       return {
         id: player.id,
         name: player.name,
@@ -419,8 +414,7 @@ app.get("/rankings", async (req, res) => {
         total_predictions: totalPredictions,
         active_weeks: activeWeeks.length,
         wins,
-        money_won: moneyWon,
-        money_spent: moneySpent
+        money_won: moneyWon
       };
     });
 
