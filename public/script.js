@@ -11,7 +11,6 @@ let currentSeason = "all";
 let payments = [];
 let newExcludedPlayers = [];
 let showActiveOnly = true;
-let historyPage = 5;
 let editExcludedPlayers = [];
 let teams = [];
 
@@ -766,8 +765,9 @@ function applySeasonFilter() {
 
 async function loadHistory() {
   historyPage = 5;
-  const weeks = await api("/history");
-  allHistoryData = weeks || [];
+  const res = await api("/history?limit=100&offset=0");
+  const weeks = res.weeks || (Array.isArray(res) ? res : []);
+  allHistoryData = weeks;
   document.getElementById("historyList")?.classList.remove("hidden");
   renderSeasonFilter(allHistoryData);
   renderRankingsFromWeeks(filterWeeksBySeason(allHistoryData));
@@ -783,10 +783,7 @@ function renderHistory(weeks) {
   }
 
   container.innerHTML = "";
-  const teamsMap = {};
-  teams.forEach(t => { teamsMap[t.id] = t; });
-  const visible = weeks.slice(0, historyPage);
-  visible.forEach(w => {
+  weeks.forEach(w => {
     let matchDateStr = "";
     if (w.match_date) {
       try {
@@ -800,8 +797,8 @@ function renderHistory(weeks) {
       : "";
     const roundStr = roundLabel ? `<span class="history-round">${roundLabel}</span>` : "";
 
-    const hHome = teamsMap[w.home_team_id];
-    const hAway = teamsMap[w.away_team_id];
+    const hHome = teams.find(t => t.id === w.home_team_id);
+    const hAway = teams.find(t => t.id === w.away_team_id);
     const hasWinner = !!w.winners;
 
     // Predictions
@@ -857,31 +854,6 @@ function renderHistory(weeks) {
     `;
     container.appendChild(div);
   });
-
-  const btnBar = document.createElement("div");
-  btnBar.style.cssText = "display:flex;gap:8px;margin-top:10px;";
-
-  if (weeks.length > historyPage) {
-    const btnMore = document.createElement("button");
-    btnMore.type = "button";
-    btnMore.className = "btn btn-ghost";
-    btnMore.style.cssText = "flex:1;font-size:13px;";
-    btnMore.textContent = `Ver más (${weeks.length - historyPage} restantes)`;
-    btnMore.onclick = () => { historyPage += 10; renderHistory(weeks); };
-    btnBar.appendChild(btnMore);
-  }
-
-  if (historyPage > 5) {
-    const btnLess = document.createElement("button");
-    btnLess.type = "button";
-    btnLess.className = "btn btn-ghost";
-    btnLess.style.cssText = "flex:1;font-size:13px;";
-    btnLess.textContent = "Ver menos";
-    btnLess.onclick = () => { historyPage = 5; renderHistory(weeks); container.scrollIntoView({ behavior: "smooth" }); };
-    btnBar.appendChild(btnLess);
-  }
-
-  if (btnBar.children.length) container.appendChild(btnBar);
 }
 
 // ===================== RANKINGS =====================
