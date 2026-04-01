@@ -839,7 +839,7 @@ function renderHistory(weeks) {
     div.className = "history-item history-accordion";
     div.innerHTML = `
       <div class="history-header">
-        <div class="history-badge-left">${hHome ? teamBadge(hHome.slug, 64) : '<div class="hist-badge-empty"></div>'}</div>
+        <div class="history-badge-left">${hHome ? teamBadge(hHome.slug, 44) : '<div class="hist-badge-empty"></div>'}</div>
         <div class="history-center">
           ${roundStr ? '<div class="history-round-row">' + roundStr + '</div>' : ""}
           <div class="history-match-name">${w.match}</div>
@@ -852,7 +852,7 @@ function renderHistory(weeks) {
             ${matchDateStr ? matchDateStr + " · " : ""}${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
           </div>
         </div>
-        <div class="history-badge-right">${hAway ? teamBadge(hAway.slug, 64) : '<div class="hist-badge-empty"></div>'}</div>
+        <div class="history-badge-right">${hAway ? teamBadge(hAway.slug, 44) : '<div class="hist-badge-empty"></div>'}</div>
       </div>
       <div class="history-body"></div>
     `;
