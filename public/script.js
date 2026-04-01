@@ -159,7 +159,7 @@ async function loadTeams() {
 
 function teamBadge(slug, size = 28) {
   if (!slug) return "";
-  return `<img src="/Escudos/${slug}.svg" width="${size}" height="${size}" loading="lazy" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
+  return `<img src="/Escudos/${slug}.svg" width="${size}" height="${size}" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
 }
 
 function renderTeamSelectors(homeId, awayId, homeVal, awayVal) {
@@ -781,18 +781,10 @@ function renderHistory(weeks) {
   }
 
   container.innerHTML = "";
-  // Build teams map once for O(1) lookup instead of find() per item
   const teamsMap = {};
   teams.forEach(t => { teamsMap[t.id] = t; });
-
-  // Render in batches to avoid blocking the UI thread
-  const BATCH = 6;
-  let idx = 0;
-
-  function renderBatch() {
-    const end = Math.min(idx + BATCH, weeks.length);
-    for (; idx < end; idx++) {
-      const w = weeks[idx];
+  const visible = weeks.slice(0, historyPage);
+  visible.forEach(w => {
     let matchDateStr = "";
     if (w.match_date) {
       try {
@@ -862,10 +854,7 @@ function renderHistory(weeks) {
       </div>
     `;
     container.appendChild(div);
-    } // end for batch
-    if (idx < weeks.length) requestAnimationFrame(renderBatch);
-  }
-  requestAnimationFrame(renderBatch);
+  });
 }
 
 // ===================== RANKINGS =====================
