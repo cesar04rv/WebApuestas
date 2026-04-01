@@ -839,20 +839,22 @@ function renderHistory(weeks) {
     div.className = "history-item history-accordion";
     div.innerHTML = `
       <div class="history-header">
-        <div class="history-badge-left">${hHome ? teamBadge(hHome.slug, 44) : '<div class="hist-badge-empty"></div>'}</div>
-        <div class="history-center">
-          ${roundStr ? '<div class="history-round-row">' + roundStr + '</div>' : ""}
-          <div class="history-match-name">${w.match}</div>
-          <div class="history-result-row">
-            <span class="history-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</span>
-            ${w.pot ? '<span class="history-pot">💰 ' + w.pot + '€</span>' : ""}
-            <span class="history-chevron">▾</span>
+        ${roundStr ? '<div class="history-round-row">' + roundStr + '</div>' : ""}
+        <div class="history-teams-row">
+          <div class="history-badge-left">${hHome ? teamBadge(hHome.slug, 44) : '<div class="hist-badge-empty"></div>'}</div>
+          <div class="history-center-inline">
+            <div class="history-match-name">${w.match}</div>
+            <div class="history-result-row">
+              <span class="history-result ${hasWinner ? "winner" : "no-winner"}">${w.real_result || "—"}</span>
+              ${w.pot ? '<span class="history-pot">💰 ' + w.pot + '€</span>' : ""}
+            </div>
           </div>
-          <div class="history-meta">
-            ${matchDateStr ? matchDateStr + " · " : ""}${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
-          </div>
+          <div class="history-badge-right">${hAway ? teamBadge(hAway.slug, 44) : '<div class="hist-badge-empty"></div>'}</div>
         </div>
-        <div class="history-badge-right">${hAway ? teamBadge(hAway.slug, 44) : '<div class="hist-badge-empty"></div>'}</div>
+        <div class="history-meta-row">
+          <span class="history-meta">${matchDateStr ? matchDateStr + " · " : ""}${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}</span>
+          <span class="history-chevron">▾</span>
+        </div>
       </div>
       <div class="history-body"></div>
     `;
