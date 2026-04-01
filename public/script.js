@@ -11,6 +11,7 @@ let currentSeason = "all";
 let payments = [];
 let newExcludedPlayers = [];
 let showActiveOnly = true;
+let historyPage = 5;
 let editExcludedPlayers = [];
 let teams = [];
 
@@ -764,6 +765,7 @@ function applySeasonFilter() {
 }
 
 async function loadHistory() {
+  historyPage = 5;
   const weeks = await api("/history");
   allHistoryData = weeks || [];
   document.getElementById("historyList")?.classList.remove("hidden");
@@ -855,6 +857,16 @@ function renderHistory(weeks) {
     `;
     container.appendChild(div);
   });
+
+  if (weeks.length > historyPage) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn btn-ghost";
+    btn.style.cssText = "width:100%;margin-top:10px;font-size:13px;";
+    btn.textContent = `Ver más (${weeks.length - historyPage} restantes)`;
+    btn.onclick = () => { historyPage += 10; renderHistory(weeks); };
+    container.appendChild(btn);
+  }
 }
 
 // ===================== RANKINGS =====================
