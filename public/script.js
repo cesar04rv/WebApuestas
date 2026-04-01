@@ -858,15 +858,30 @@ function renderHistory(weeks) {
     container.appendChild(div);
   });
 
+  const btnBar = document.createElement("div");
+  btnBar.style.cssText = "display:flex;gap:8px;margin-top:10px;";
+
   if (weeks.length > historyPage) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "btn btn-ghost";
-    btn.style.cssText = "width:100%;margin-top:10px;font-size:13px;";
-    btn.textContent = `Ver más (${weeks.length - historyPage} restantes)`;
-    btn.onclick = () => { historyPage += 10; renderHistory(weeks); };
-    container.appendChild(btn);
+    const btnMore = document.createElement("button");
+    btnMore.type = "button";
+    btnMore.className = "btn btn-ghost";
+    btnMore.style.cssText = "flex:1;font-size:13px;";
+    btnMore.textContent = `Ver más (${weeks.length - historyPage} restantes)`;
+    btnMore.onclick = () => { historyPage += 10; renderHistory(weeks); };
+    btnBar.appendChild(btnMore);
   }
+
+  if (historyPage > 5) {
+    const btnLess = document.createElement("button");
+    btnLess.type = "button";
+    btnLess.className = "btn btn-ghost";
+    btnLess.style.cssText = "flex:1;font-size:13px;";
+    btnLess.textContent = "Ver menos";
+    btnLess.onclick = () => { historyPage = 5; renderHistory(weeks); container.scrollIntoView({ behavior: "smooth" }); };
+    btnBar.appendChild(btnLess);
+  }
+
+  if (btnBar.children.length) container.appendChild(btnBar);
 }
 
 // ===================== RANKINGS =====================
