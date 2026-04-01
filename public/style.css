@@ -509,18 +509,27 @@ body {
   margin-bottom: 8px;
   padding-top: 10px;
   text-transform: uppercase;
+  text-align: center;
 }
-.hist-preds-grid { display: flex; flex-direction: column; gap: 4px; }
-.hist-pred {
-  display: grid;
-  grid-template-columns: 28px 1fr auto auto;
+.hist-preds-grid { 
+  display: flex; 
+  flex-direction: column; 
+  gap: 4px; 
   align-items: center;
+  width: 100%;
+}
+.hist-pred {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
   padding: 5px 8px;
   border-radius: 6px;
   background: rgba(255,255,255,0.03);
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 14px;
+  max-width: 400px;
+  width: 100%;
 }
 .hist-pred.correct { background: rgba(0,200,83,0.08); border: 1px solid rgba(0,200,83,0.2); }
 .hist-pred-order { color: var(--text-muted); font-size: 12px; }
@@ -626,7 +635,12 @@ body {
   margin-bottom: 8px;
   padding-top: 10px;
 }
-.history-payments { display: flex; flex-wrap: wrap; gap: 6px; }
+.history-payments { 
+  display: flex; 
+  flex-wrap: wrap; 
+  gap: 6px;
+  justify-content: center;
+}
 .history-pay-badge {
   font-family: 'Barlow Condensed', sans-serif;
   font-size: 13px;
