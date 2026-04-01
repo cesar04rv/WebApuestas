@@ -922,11 +922,12 @@ function renderRankings(data) {
   sorted.forEach((p, i) => {
     const rate = p.total_predictions > 0 ? ((p.wins / p.total_predictions) * 100).toFixed(0) : 0;
     const displayValue = currentTab === "wins" ? p.wins : currentTab === "money" ? (p.money_won || 0) + "€" : rate + "%";
+    const spent = p.money_spent || 0;
     const subText = currentTab === "wins"
-      ? `${p.money_won || 0}€ ganados · ${rate}% acierto · ${p.total_predictions} apuestas`
+      ? `${p.money_won || 0}€ ganados · ${rate}% acierto · ${p.total_predictions} apuestas · ${spent}€ invertidos`
       : currentTab === "money"
-      ? `${p.wins} victorias · ${rate}% acierto`
-      : `${p.wins} victorias · ${p.total_predictions} apuestas`;
+      ? `${p.wins} victorias · ${rate}% acierto · ${spent}€ invertidos`
+      : `${p.wins} victorias · ${p.total_predictions} apuestas · ${spent}€ invertidos`;
 
     const div = document.createElement("div");
     div.className = "ranking-item" + (p.active == 0 ? " inactive-player" : "");
