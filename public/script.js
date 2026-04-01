@@ -159,7 +159,7 @@ async function loadTeams() {
 
 function teamBadge(slug, size = 28) {
   if (!slug) return "";
-  return `<img src="/Escudos/${slug}.svg" width="${size}" height="${size}" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
+  return `<img src="/Escudos/${slug}.svg" width="${size}" height="${size}" loading="lazy" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
 }
 
 function renderTeamSelectors(homeId, awayId, homeVal, awayVal) {
@@ -781,7 +781,18 @@ function renderHistory(weeks) {
   }
 
   container.innerHTML = "";
-  weeks.forEach(w => {
+  // Build teams map once for O(1) lookup instead of find() per item
+  const teamsMap = {};
+  teams.forEach(t => { teamsMap[t.id] = t; });
+
+  // Render in batches to avoid blocking the UI thread
+  const BATCH = 6;
+  let idx = 0;
+
+  function renderBatch() {
+    const end = Math.min(idx + BATCH, weeks.length);
+    for (; idx < end; idx++) {
+      const w = weeks[idx];
     let matchDateStr = "";
     if (w.match_date) {
       try {
@@ -795,8 +806,8 @@ function renderHistory(weeks) {
       : "";
     const roundStr = roundLabel ? `<span class="history-round">${roundLabel}</span>` : "";
 
-    const hHome = teams.find(t => t.id === w.home_team_id);
-    const hAway = teams.find(t => t.id === w.away_team_id);
+    const hHome = teamsMap[w.home_team_id];
+    const hAway = teamsMap[w.away_team_id];
     const hasWinner = !!w.winners;
 
     // Predictions
@@ -851,7 +862,10 @@ function renderHistory(weeks) {
       </div>
     `;
     container.appendChild(div);
-  });
+    } // end for batch
+    if (idx < weeks.length) requestAnimationFrame(renderBatch);
+  }
+  requestAnimationFrame(renderBatch);
 }
 
 // ===================== RANKINGS =====================
