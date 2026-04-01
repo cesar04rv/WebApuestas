@@ -10,6 +10,7 @@ let currentTab = "wins";
 let currentSeason = "all";
 let payments = [];
 let newExcludedPlayers = [];
+let showActiveOnly = true;
 let editExcludedPlayers = [];
 let teams = [];
 
@@ -879,6 +880,13 @@ function renderRankingsFromWeeks(weeks) {
   renderRankings(filtered);
 }
 
+function toggleActiveOnly() {
+  showActiveOnly = !showActiveOnly;
+  const btn = document.getElementById("activeOnlySwitch");
+  if (btn) btn.classList.toggle("active", showActiveOnly);
+  applySeasonFilter();
+}
+
 function switchTab(tab, e) {
   currentTab = tab;
   document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
@@ -888,7 +896,8 @@ function switchTab(tab, e) {
 
 function renderRankings(data) {
   const container = document.getElementById("rankingsList");
-  const displayData = data || rankingsData;
+  let displayData = data || rankingsData;
+  if (showActiveOnly) displayData = displayData.filter(p => p.active != 0);
 
   if (!displayData.length) {
     container.innerHTML = '<p class="empty-state">Aún no hay datos de ranking.</p>';
