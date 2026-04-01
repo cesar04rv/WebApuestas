@@ -39,6 +39,7 @@ async function loadData() {
   await loadWeek();
   await loadPredictions();
   await loadPayments();
+  reorderList = []; // reset so renderReorder picks up fresh DB order
   calculateTurn();
   renderPlayers();
   renderReorder();
@@ -779,11 +780,19 @@ function renderHistory(weeks) {
 
   container.innerHTML = "";
   weeks.forEach(w => {
+    let dateStr = "";
+    if (w.created_at) {
+      try {
+        const d = new Date(w.created_at);
+        dateStr = d.toLocaleDateString("es-ES", { day: "numeric", month: "long", year: "numeric" });
+      } catch(e) { dateStr = w.created_at; }
+    }
+
     let matchDateStr = "";
     if (w.match_date) {
       try {
-        const d = new Date(w.match_date.length === 16 ? w.match_date + ":00" : w.match_date);
-        if (!isNaN(d)) matchDateStr = d.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+        const d = new Date(w.match_date);
+        matchDateStr = " · " + d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
       } catch(e) {}
     }
 
@@ -836,7 +845,7 @@ function renderHistory(weeks) {
             <span class="history-chevron">▾</span>
           </div>
           <div class="history-meta">
-            ${matchDateStr ? matchDateStr + " · " : ""}${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
+            ${dateStr}${matchDateStr} · ${hasWinner ? "🏆 " + w.winners : "Sin acertantes"}
           </div>
         </div>
         <div class="history-badge-right">${hAway ? teamBadge(hAway.slug, 64) : '<div class="hist-badge-empty"></div>'}</div>
