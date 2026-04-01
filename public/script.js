@@ -159,7 +159,7 @@ async function loadTeams() {
 
 function teamBadge(slug, size = 28) {
   if (!slug) return "";
-  return `<img src="/Escudos/${slug}.svg" width="${size}" height="${size}" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
+  return `<img src="/Escudos/${slug}.svg" width="${size}" height="${size}" loading="lazy" decoding="async" style="vertical-align:middle;object-fit:contain;margin:0 2px" onerror="this.style.display='none'">`;
 }
 
 function renderTeamSelectors(homeId, awayId, homeVal, awayVal) {
@@ -774,6 +774,36 @@ async function loadHistory() {
   renderHistory(filterWeeksBySeason(allHistoryData));
 }
 
+function buildHistoryBody(w) {
+  const predsHTML = w.predictions?.length
+    ? w.predictions.map(pr => `
+        <div class="hist-pred ${pr.correct ? "correct" : ""}">
+          <span class="hist-pred-order">#${pr.order}</span>
+          <span class="hist-pred-name">${pr.player_name}</span>
+          <span class="hist-pred-result">${pr.result}</span>
+          ${pr.correct ? '<span class="hist-pred-badge">&#10003;</span>' : ''}
+        </div>`).join("")
+    : '<p class="empty-state" style="padding:6px 0;font-size:12px">Nadie apostó</p>';
+
+  const excludedHTML = w.excluded?.length
+    ? `<div class="hist-excluded">No jugaron: ${w.excluded.join(", ")}</div>` : "";
+
+  const payList = w.payments || [];
+  const paidCount = payList.filter(pay => pay.paid).length;
+  const paymentsHTML = payList.length
+    ? '<div class="history-payments">' + payList.map(pay =>
+        '<span class="history-pay-badge ' + (pay.paid ? "paid" : "unpaid") + '">' +
+        (pay.paid ? "&#10003;" : "&#10007;") + " " + pay.name + '</span>'
+      ).join("") + '</div>'
+    : "";
+
+  return `
+    <div class="hist-section-title">⚽ Apuestas · <span style="color:var(--text-muted);font-size:12px">${w.weekly_amount || 1}€/persona${excludedHTML ? " · " + w.excluded?.join(", ") + " no jugaron" : ""}</span></div>
+    <div class="hist-preds-grid">${predsHTML}</div>
+    ${payList.length ? `<div class="hist-section-title" style="margin-top:10px">💶 Pagos (${paidCount}/${payList.length})</div>${paymentsHTML}` : ""}
+  `;
+}
+
 function renderHistory(weeks) {
   const container = document.getElementById("historyList");
 
@@ -783,7 +813,12 @@ function renderHistory(weeks) {
   }
 
   container.innerHTML = "";
-  weeks.forEach(w => {
+  const teamsMap = {};
+  teams.forEach(t => { teamsMap[t.id] = t; });
+  const visible = weeks.slice(0, historyPage);
+  const fragment = document.createDocumentFragment();
+
+  visible.forEach(w => {
     let matchDateStr = "";
     if (w.match_date) {
       try {
@@ -796,39 +831,12 @@ function renderHistory(weeks) {
       ? (w.round_number.toUpperCase().startsWith("JORNADA") ? w.round_number.toUpperCase() : `JORNADA ${w.round_number.toUpperCase()}`)
       : "";
     const roundStr = roundLabel ? `<span class="history-round">${roundLabel}</span>` : "";
-
-    const hHome = teams.find(t => t.id === w.home_team_id);
-    const hAway = teams.find(t => t.id === w.away_team_id);
+    const hHome = teamsMap[w.home_team_id];
+    const hAway = teamsMap[w.away_team_id];
     const hasWinner = !!w.winners;
-
-    // Predictions
-    const predsHTML = w.predictions?.length
-      ? w.predictions.map(pr => `
-          <div class="hist-pred ${pr.correct ? "correct" : ""}">
-            <span class="hist-pred-order">#${pr.order}</span>
-            <span class="hist-pred-name">${pr.player_name}</span>
-            <span class="hist-pred-result">${pr.result}</span>
-            ${pr.correct ? '<span class="hist-pred-badge">&#10003;</span>' : ''}
-          </div>`).join("")
-      : '<p class="empty-state" style="padding:6px 0;font-size:12px">Nadie apost&#243;</p>';
-
-    // Excluded
-    const excludedHTML = w.excluded?.length
-      ? `<div class="hist-excluded">No jugaron: ${w.excluded.join(", ")}</div>`
-      : "";
-
-    // Payments
-    const payList = w.payments || [];
-    const paidCount = payList.filter(pay => pay.paid).length;
-    const paymentsHTML = payList.length
-      ? '<div class="history-payments">' + payList.map(pay =>
-          '<span class="history-pay-badge ' + (pay.paid ? "paid" : "unpaid") + '">' + (pay.paid ? "&#10003;" : "&#10007;") + " " + pay.name + '</span>'
-        ).join("") + '</div>'
-      : "";
 
     const div = document.createElement("div");
     div.className = "history-item history-accordion";
-    div.onclick = () => div.classList.toggle("open");
     div.innerHTML = `
       <div class="history-header">
         <div class="history-badge-left">${hHome ? teamBadge(hHome.slug, 64) : '<div class="hist-badge-empty"></div>'}</div>
@@ -846,14 +854,48 @@ function renderHistory(weeks) {
         </div>
         <div class="history-badge-right">${hAway ? teamBadge(hAway.slug, 64) : '<div class="hist-badge-empty"></div>'}</div>
       </div>
-      <div class="history-body">
-        <div class="hist-section-title">⚽ Apuestas · <span style="color:var(--text-muted);font-size:12px">${w.weekly_amount || 1}€/persona${excludedHTML ? " · " + w.excluded?.join(", ") + " no jugaron" : ""}</span></div>
-        <div class="hist-preds-grid">${predsHTML}</div>
-        ${payList.length ? `<div class="hist-section-title" style="margin-top:10px">💶 Pagos (${paidCount}/${payList.length})</div>${paymentsHTML}` : ""}
-      </div>
+      <div class="history-body"></div>
     `;
-    container.appendChild(div);
+
+    // Lazy body: only build content when accordion opens
+    div.addEventListener("click", () => {
+      const body = div.querySelector(".history-body");
+      if (!body.dataset.loaded) {
+        body.innerHTML = buildHistoryBody(w);
+        body.dataset.loaded = "1";
+      }
+      div.classList.toggle("open");
+    });
+
+    fragment.appendChild(div);
   });
+
+  container.appendChild(fragment);
+
+  const btnBar = document.createElement("div");
+  btnBar.style.cssText = "display:flex;gap:8px;margin-top:10px;";
+
+  if (weeks.length > historyPage) {
+    const btnMore = document.createElement("button");
+    btnMore.type = "button";
+    btnMore.className = "btn btn-ghost";
+    btnMore.style.cssText = "flex:1;font-size:13px;";
+    btnMore.textContent = `Ver más (${weeks.length - historyPage} restantes)`;
+    btnMore.onclick = () => { historyPage += 10; renderHistory(weeks); };
+    btnBar.appendChild(btnMore);
+  }
+
+  if (historyPage > 5) {
+    const btnLess = document.createElement("button");
+    btnLess.type = "button";
+    btnLess.className = "btn btn-ghost";
+    btnLess.style.cssText = "flex:1;font-size:13px;";
+    btnLess.textContent = "Ver menos";
+    btnLess.onclick = () => { historyPage = 5; renderHistory(weeks); container.scrollIntoView({ behavior: "smooth" }); };
+    btnBar.appendChild(btnLess);
+  }
+
+  if (btnBar.children.length) container.appendChild(btnBar);
 }
 
 // ===================== RANKINGS =====================
