@@ -288,27 +288,6 @@ app.post("/close-week", async (req, res) => {
       [real_result.trim(), amountPerPerson, newPot, nextPot, week_id]
     );
 
-    // Crear registros de payments para todos los que apostaron, marcándolos como pagados
-    // Primero asegurarse de que la tabla payments existe
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS payments (
-        id SERIAL PRIMARY KEY,
-        week_id INTEGER NOT NULL,
-        player_id INTEGER NOT NULL,
-        paid INTEGER DEFAULT 0,
-        UNIQUE(week_id, player_id)
-      )
-    `);
-    
-    // Insertar un registro de pago para cada jugador que apostó
-    // Si ya existe, actualizar a pagado
-    for (const pred of preds) {
-      await client.query(
-        "INSERT INTO payments (week_id, player_id, paid) VALUES ($1, $2, $3) ON CONFLICT (week_id, player_id) DO UPDATE SET paid = $3",
-        [week_id, pred.player_id, 1]
-      );
-    }
-
     // Rotación: solo entre jugadores activos no excluidos
     const { rows: allActivePlayers } = await client.query(
       "SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC",
