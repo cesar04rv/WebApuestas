@@ -116,8 +116,15 @@ async function loadWeek() {
   } else {
     weekInfoEl.textContent = currentWeek.match;
   }
+  
+  // Calcular el bote total: bote acumulado + dinero de esta semana (1€ por jugador activo no excluido)
+  const excludedIds = currentWeek.excluded_players ? currentWeek.excluded_players.split(",").filter(Boolean).map(Number) : [];
+  const activePlayers = players.filter(p => p.active && !excludedIds.includes(p.id));
+  const weeklyContribution = activePlayers.length * 1; // 1€ por persona
+  const totalPot = (currentWeek.pot || 0) + weeklyContribution;
+  
   document.getElementById("potInfo").textContent =
-    currentWeek.pot > 0 ? `💰 Bote: ${currentWeek.pot} €` : "";
+    totalPot > 0 ? `💰 Bote: ${totalPot} €` : "";
   document.getElementById("weekStatus").textContent = "SEMANA EN CURSO";
   document.getElementById("turnBanner").classList.remove("hidden");
 
