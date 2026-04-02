@@ -295,14 +295,16 @@ app.post("/close-week", async (req, res) => {
         id SERIAL PRIMARY KEY,
         week_id INTEGER NOT NULL,
         player_id INTEGER NOT NULL,
-        paid INTEGER DEFAULT 0
+        paid INTEGER DEFAULT 0,
+        UNIQUE(week_id, player_id)
       )
     `);
     
     // Insertar un registro de pago para cada jugador que apostó
+    // Si ya existe, actualizar a pagado
     for (const pred of preds) {
       await client.query(
-        "INSERT INTO payments (week_id, player_id, paid) VALUES ($1, $2, $3)",
+        "INSERT INTO payments (week_id, player_id, paid) VALUES ($1, $2, $3) ON CONFLICT (week_id, player_id) DO UPDATE SET paid = $3",
         [week_id, pred.player_id, 1]
       );
     }
