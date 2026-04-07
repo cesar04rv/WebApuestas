@@ -49,6 +49,14 @@ async function loadData() {
   await loadRankings();
   await loadHistory();
   document.getElementById("playersCount").textContent = players.filter(p => p.active).length;
+  
+  // =====================================================
+  // 🔥 FIREBASE: Renderizar gestión de usuarios si es admin
+  // =====================================================
+  if (currentUser && currentUser.role === 'admin') {
+    renderUserManagement();
+  }
+  // =====================================================
 }
 
 // ===================== FETCH =====================
