@@ -14,11 +14,6 @@ let showActiveOnly = true;
 let editExcludedPlayers = [];
 let teams = [];
 
-// =====================================================
-// 🔥 FIREBASE: Info del usuario actual
-// =====================================================
-let currentUser = null; // {playerId, playerName, role, email}
-
 // ===================== INIT =====================
 let isRedirecting = false;
 
@@ -32,29 +27,6 @@ let isRedirecting = false;
       }
       return;
     }
-    
-    // =====================================================
-    // 🔥 FIREBASE: Guardar info del usuario
-    // =====================================================
-    currentUser = {
-      playerId: me.playerId,
-      playerName: me.playerName,
-      role: me.role,
-      email: me.email
-    };
-    
-    // Mostrar mensaje de bienvenida en consola
-    if (currentUser.playerName) {
-      console.log(`👋 Bienvenid@ ${currentUser.playerName} (${currentUser.role})`);
-    }
-    
-    // 🔥 FIREBASE: Ocultar botón Admin si no es admin
-    if (currentUser.role !== 'admin') {
-      const adminBtn = document.querySelector('.btn-admin-toggle');
-      if (adminBtn) adminBtn.style.display = 'none';
-    }
-    // =====================================================
-    
     loadData();
   } catch(e) {
     console.error("Error checking auth:", e);
@@ -77,14 +49,6 @@ async function loadData() {
   await loadRankings();
   await loadHistory();
   document.getElementById("playersCount").textContent = players.filter(p => p.active).length;
-  
-  // =====================================================
-  // 🔥 FIREBASE: Renderizar gestión de usuarios si es admin
-  // =====================================================
-  if (currentUser && currentUser.role === 'admin') {
-    renderUserManagement();
-  }
-  // =====================================================
 }
 
 // ===================== FETCH =====================
@@ -621,15 +585,6 @@ function sendPrediction() {
   if (!currentWeek) return toast("No hay semana activa", "error");
   if (!currentTurnPlayer) return toast("No hay turno activo", "error");
 
-  // =====================================================
-  // 🔥 FIREBASE: Control de permisos
-  // =====================================================
-  // Los jugadores solo pueden hacer su propia apuesta
-  if (currentUser && currentUser.role !== 'admin' && currentUser.playerId !== currentTurnPlayer.id) {
-    return toast("Solo puedes hacer tu propia apuesta", "error");
-  }
-  // =====================================================
-
   const local = document.getElementById("resultLocal").value.trim();
   const visit = document.getElementById("resultVisit").value.trim();
   if (local === "" || visit === "") return toast("Introduce los dos goles", "error");
@@ -1049,15 +1004,12 @@ async function captureAndShare() {
   const btn = document.querySelector(".btn-share");
   if (btn) { btn.disabled = true; btn.textContent = "⏳ Generando..."; }
 
-  // Show firma
   const firma = document.getElementById("scoreboardFirma");
   if (firma) firma.classList.add("visible");
 
-  // Elements to capture
   const scoreboard = document.getElementById("scoreboard");
   const playersCard = document.getElementById("playersList").closest(".card");
 
-  // Create wrapper
   const wrapper = document.createElement("div");
   wrapper.style.cssText = "background:#0a0e1a;padding:20px;display:flex;flex-direction:column;gap:20px;width:" + scoreboard.offsetWidth + "px;position:fixed;left:-9999px;top:0;";
   wrapper.appendChild(scoreboard.cloneNode(true));
@@ -1065,15 +1017,37 @@ async function captureAndShare() {
   document.body.appendChild(wrapper);
 
   try {
+    // 🔧 FIX: Convertir SVGs a PNG para móviles
+    const svgElements = wrapper.querySelectorAll('img[src$=".svg"]');
+    const conversionPromises = [];
+    
+    svgElements.forEach(img => {
+      const promise = new Promise((resolve) => {
+        if (img.complete && img.naturalWidth > 0) {
+          convertSvgToDataUrl(img).then(() => resolve());
+        } else {
+          img.onload = () => {
+            convertSvgToDataUrl(img).then(() => resolve());
+          };
+          img.onerror = () => resolve();
+        }
+      });
+      conversionPromises.push(promise);
+    });
+    
+    await Promise.all(conversionPromises);
+    await new Promise(resolve => setTimeout(resolve, 300));
+
     const canvas = await html2canvas(wrapper, {
       backgroundColor: "#0a0e1a",
       scale: 2,
       useCORS: true,
       allowTaint: true,
-      logging: false
+      logging: false,
+      imageTimeout: 0,
+      removeContainer: false
     });
 
-    // Download
     const link = document.createElement("a");
     link.download = "porra_" + (currentWeek?.match || "semana").replace(/[^a-z0-9]/gi, "_").toLowerCase() + ".png";
     link.href = canvas.toDataURL("image/png");
@@ -1090,16 +1064,78 @@ async function captureAndShare() {
   }
 }
 
+async function convertSvgToDataUrl(imgElement) {
+  return new Promise((resolve) => {
+    try {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        canvas.width = imgElement.width || imgElement.offsetWidth || 50;
+        canvas.height = imgElement.height || imgElement.offsetHeight || 50;
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        try {
+          const dataUrl = canvas.toDataURL('image/png');
+          imgElement.src = dataUrl;
+          resolve();
+        } catch (e) {
+          console.warn('Error converting SVG:', e);
+          resolve();
+        }
+      };
+      
+      img.onerror = () => {
+        console.warn('Error loading SVG');
+        resolve();
+      };
+      
+      img.src = imgElement.src;
+    } catch (e) {
+      console.warn('Error in convertSvgToDataUrl:', e);
+      resolve();
+    }
+  });
+}
+
 // ===================== ADMIN DRAWER =====================
 function toggleAdmin() {
-  // =====================================================
-  // 🔥 FIREBASE: Solo admins pueden abrir el panel
-  // =====================================================
   if (currentUser && currentUser.role !== 'admin') {
     return toast("No tienes permisos de administrador", "error");
   }
-  // =====================================================
   
+  const drawer = document.getElementById("adminDrawer");
+  const overlay = document.getElementById("drawerOverlay");
+  const isOpen = drawer.classList.contains("open");
+
+  if (isOpen) {
+    drawer.classList.remove("open");
+    overlay.classList.add("hidden");
+    document.body.style.overflow = "";
+  } else {
+    if (currentWeek) {
+      document.getElementById("editMatch").value = currentWeek.match || "";
+      document.getElementById("editRound").value = currentWeek.round_number || "";
+      if (currentWeek.match_date) {
+        document.getElementById("editMatchDate").value = currentWeek.match_date.slice(0, 16);
+      }
+      editExcludedPlayers = getExcludedForCurrentWeek();
+    }
+    renderExcludeLists();
+    renderManagePlayers();
+    renderManageTeams();
+    renderTeamSelectors("newHomeTeam", "newAwayTeam");
+    renderTeamSelectors("editHomeTeam", "editAwayTeam", currentWeek?.home_team_id, currentWeek?.away_team_id);
+    drawer.classList.add("open");
+    overlay.classList.remove("hidden");
+    document.body.style.overflow = "hidden";
+  }
+}
+// ===================== ADMIN DRAWER =====================
+function toggleAdmin() {
   const drawer = document.getElementById("adminDrawer");
   const overlay = document.getElementById("drawerOverlay");
   const isOpen = drawer.classList.contains("open");
@@ -1259,120 +1295,3 @@ document.addEventListener("DOMContentLoaded", () => {
     else closeModal();
   });
 });
-// =====================================================
-// 🔥 FIREBASE: GESTIÓN DE USUARIOS (SOLO ADMIN)
-// =====================================================
-
-function renderUserManagement() {
-  // Llenar select de jugadores
-  const select = document.getElementById("userPlayerSelect");
-  if (!select) return;
-  
-  select.innerHTML = '<option value="">Selecciona un jugador...</option>';
-  players.forEach(p => {
-    const option = document.createElement("option");
-    option.value = p.id;
-    option.textContent = `${p.name}${p.email ? ' (' + p.email + ')' : ''}`;
-    select.appendChild(option);
-  });
-  
-  // Renderizar lista de usuarios
-  renderUserList();
-}
-
-async function associateEmail() {
-  const playerId = document.getElementById("userPlayerSelect").value;
-  const email = document.getElementById("userEmail").value.trim().toLowerCase();
-  
-  if (!playerId || !email) {
-    return toast("Selecciona un jugador e introduce un email", "error");
-  }
-  
-  if (!email.includes("@")) {
-    return toast("Email inválido", "error");
-  }
-  
-  try {
-    const data = await post("/api/associate-email", { player_id: parseInt(playerId), email });
-    if (data.error) {
-      return toast(data.error, "error");
-    }
-    toast("✓ Email asociado correctamente", "success");
-    document.getElementById("userEmail").value = "";
-    document.getElementById("userPlayerSelect").value = "";
-    await loadPlayers();
-    renderManagePlayers();
-    renderUserManagement();
-  } catch (err) {
-    toast(err.message || "Error al asociar email", "error");
-  }
-}
-
-async function changeUserRole(playerId, newRole) {
-  const player = players.find(p => p.id === playerId);
-  if (!player) return;
-  
-  const confirmMsg = newRole === 'admin' 
-    ? `¿Hacer a ${player.name} administrador? Tendrá acceso total al panel de administración.`
-    : `¿Quitar permisos de administrador a ${player.name}? Solo podrá hacer sus propias apuestas.`;
-  
-  showModal({
-    icon: "👤",
-    title: "Cambiar rol de usuario",
-    body: confirmMsg,
-    confirmText: "Sí, cambiar rol",
-    danger: newRole === 'player',
-    onConfirm: async () => {
-      try {
-        const data = await post("/api/change-role", { player_id: playerId, role: newRole });
-        if (data.error) {
-          return toast(data.error, "error");
-        }
-        toast(`✓ Rol de ${player.name} actualizado a ${newRole === 'admin' ? 'Administrador' : 'Jugador'}`, "success");
-        await loadPlayers();
-        renderUserManagement();
-      } catch (err) {
-        toast("Error al cambiar rol", "error");
-      }
-    }
-  });
-}
-
-function renderUserList() {
-  const container = document.getElementById("usersList");
-  if (!container) return;
-  
-  container.innerHTML = "";
-  
-  // Ordenar: primero admins, luego jugadores con email, luego sin email
-  const sorted = [...players].sort((a, b) => {
-    if (a.role === 'admin' && b.role !== 'admin') return -1;
-    if (a.role !== 'admin' && b.role === 'admin') return 1;
-    if (a.email && !b.email) return -1;
-    if (!a.email && b.email) return 1;
-    return 0;
-  });
-  
-  sorted.forEach(p => {
-    const div = document.createElement("div");
-    div.className = "user-item";
-    div.innerHTML = `
-      <div class="user-info">
-        <div class="user-name">${p.name}</div>
-        <div class="user-email">${p.email || '<span style="color:#6b7a99">Sin email asociado</span>'}</div>
-      </div>
-      <div class="user-actions">
-        <span class="user-role-badge ${p.role === 'admin' ? 'admin' : ''}">${p.role === 'admin' ? 'ADMIN' : 'Jugador'}</span>
-        ${p.role === 'admin' 
-          ? `<button class="btn-mini btn-red" onclick="changeUserRole(${p.id}, 'player')">Quitar Admin</button>`
-          : `<button class="btn-mini btn-green" onclick="changeUserRole(${p.id}, 'admin')">Hacer Admin</button>`
-        }
-      </div>
-    `;
-    container.appendChild(div);
-  });
-  
-  if (sorted.length === 0) {
-    container.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7a99;font-size:13px">No hay jugadores</div>';
-  }
-}
