@@ -1295,3 +1295,121 @@ document.addEventListener("DOMContentLoaded", () => {
     else closeModal();
   });
 });
+
+// =====================================================
+// 🔥 FIREBASE: GESTIÓN DE USUARIOS (SOLO ADMIN)
+// =====================================================
+
+function renderUserManagement() {
+  // Llenar select de jugadores
+  const select = document.getElementById("userPlayerSelect");
+  if (!select) return;
+  
+  select.innerHTML = '<option value="">Selecciona un jugador...</option>';
+  players.forEach(p => {
+    const option = document.createElement("option");
+    option.value = p.id;
+    option.textContent = `${p.name}${p.email ? ' (' + p.email + ')' : ''}`;
+    select.appendChild(option);
+  });
+  
+  // Renderizar lista de usuarios
+  renderUserList();
+}
+
+async function associateEmail() {
+  const playerId = document.getElementById("userPlayerSelect").value;
+  const email = document.getElementById("userEmail").value.trim().toLowerCase();
+  
+  if (!playerId || !email) {
+    return toast("Selecciona un jugador e introduce un email", "error");
+  }
+  
+  if (!email.includes("@")) {
+    return toast("Email inválido", "error");
+  }
+  
+  try {
+    const data = await post("/api/associate-email", { player_id: parseInt(playerId), email });
+    if (data.error) {
+      return toast(data.error, "error");
+    }
+    toast("✓ Email asociado correctamente", "success");
+    document.getElementById("userEmail").value = "";
+    document.getElementById("userPlayerSelect").value = "";
+    await loadPlayers();
+    renderManagePlayers();
+    renderUserManagement();
+  } catch (err) {
+    toast(err.message || "Error al asociar email", "error");
+  }
+}
+
+async function changeUserRole(playerId, newRole) {
+  const player = players.find(p => p.id === playerId);
+  if (!player) return;
+  
+  const confirmMsg = newRole === 'admin' 
+    ? `¿Hacer a ${player.name} administrador? Tendrá acceso total al panel de administración.`
+    : `¿Quitar permisos de administrador a ${player.name}? Solo podrá hacer sus propias apuestas.`;
+  
+  showModal({
+    icon: "👤",
+    title: "Cambiar rol de usuario",
+    body: confirmMsg,
+    confirmText: "Sí, cambiar rol",
+    danger: newRole === 'player',
+    onConfirm: async () => {
+      try {
+        const data = await post("/api/change-role", { player_id: playerId, role: newRole });
+        if (data.error) {
+          return toast(data.error, "error");
+        }
+        toast(`✓ Rol de ${player.name} actualizado a ${newRole === 'admin' ? 'Administrador' : 'Jugador'}`, "success");
+        await loadPlayers();
+        renderUserManagement();
+      } catch (err) {
+        toast("Error al cambiar rol", "error");
+      }
+    }
+  });
+}
+
+function renderUserList() {
+  const container = document.getElementById("usersList");
+  if (!container) return;
+  
+  container.innerHTML = "";
+  
+  // Ordenar: primero admins, luego jugadores con email, luego sin email
+  const sorted = [...players].sort((a, b) => {
+    if (a.role === 'admin' && b.role !== 'admin') return -1;
+    if (a.role !== 'admin' && b.role === 'admin') return 1;
+    if (a.email && !b.email) return -1;
+    if (!a.email && b.email) return 1;
+    return 0;
+  });
+  
+  sorted.forEach(p => {
+    const div = document.createElement("div");
+    div.className = "user-item";
+    div.innerHTML = `
+      <div class="user-info">
+        <div class="user-name">${p.name}</div>
+        <div class="user-email">${p.email || '<span style="color:#6b7a99">Sin email asociado</span>'}</div>
+      </div>
+      <div class="user-actions">
+        <span class="user-role-badge ${p.role === 'admin' ? 'admin' : ''}">${p.role === 'admin' ? 'ADMIN' : 'Jugador'}</span>
+        ${p.role === 'admin' 
+          ? `<button class="btn-mini btn-red" onclick="changeUserRole(${p.id}, 'player')">Quitar Admin</button>`
+          : `<button class="btn-mini btn-green" onclick="changeUserRole(${p.id}, 'admin')">Hacer Admin</button>`
+        }
+      </div>
+    `;
+    container.appendChild(div);
+  });
+  
+  if (sorted.length === 0) {
+    container.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7a99;font-size:13px">No hay jugadores</div>';
+  }
+}
