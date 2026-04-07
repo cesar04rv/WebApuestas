@@ -318,13 +318,33 @@
       onAuthStateChanged
     } from './firebase-config.js';
 
-    // Check if already authenticated
+    // =====================================================
+    // 🔥 FIX: Verificar sesión del backend antes de redirigir
+    // =====================================================
+    let isCheckingAuth = false;
+    
     onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // User is signed in, redirect to main app
-        window.location.href = '/';
+      if (user && !isCheckingAuth) {
+        isCheckingAuth = true;
+        
+        // Verificar si tenemos sesión en el backend
+        try {
+          const response = await fetch('/api/me');
+          const data = await response.json();
+          
+          if (data.authenticated) {
+            // Tenemos sesión válida en backend, redirigir
+            window.location.href = '/';
+          }
+          // Si no está autenticado en backend, quedarse en login
+        } catch (err) {
+          console.error('Error verificando sesión:', err);
+        }
+        
+        isCheckingAuth = false;
       }
     });
+    // =====================================================
 
     window.switchForm = function(formName) {
       // Hide all forms
