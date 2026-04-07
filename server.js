@@ -412,6 +412,28 @@ app.post("/api/change-role", async (req, res) => {
     return res.status(400).json({ error: "Datos inválidos" });
   }
   
+  // =====================================================
+  // 🔒 VALIDACIONES DE SEGURIDAD
+  // =====================================================
+  
+  // 1. NO puedes quitarte admin a ti mismo
+  if (role === 'player' && player_id === req.session.user.playerId) {
+    return res.status(400).json({ error: "No puedes quitarte permisos de admin a ti mismo" });
+  }
+  
+  // 2. NO puedes quitar admin si es el último admin
+  if (role === 'player') {
+    const adminCountResult = await pool.query(
+      "SELECT COUNT(*) as count FROM players WHERE role = 'admin'"
+    );
+    const adminCount = parseInt(adminCountResult.rows[0].count);
+    
+    if (adminCount <= 1) {
+      return res.status(400).json({ error: "No puedes quitar el último administrador. Haz admin a alguien más primero." });
+    }
+  }
+  // =====================================================
+  
   try {
     await pool.query(
       "UPDATE players SET role = $1 WHERE id = $2",
