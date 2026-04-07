@@ -5,13 +5,55 @@ const { Pool } = require("pg");
 const bodyParser = require("body-parser");
 const session = require("express-session");
 
+// =====================================================
+// 🔥 FIREBASE ADMIN SDK (RENDER SECRET FILES)
+// =====================================================
+// Necesario para validar tokens de Firebase Authentication
+const admin = require("firebase-admin");
+const fs = require("fs");
+
+try {
+  let serviceAccount;
+  
+  // OPCIÓN 1: Secret Files de Render (RECOMENDADO)
+  // En Render Dashboard → Environment → Secret Files → Add Secret File
+  // Filename: firebase-service-account.json
+  // Contents: Pega el JSON completo del Service Account Key
+  if (fs.existsSync('/etc/secrets/firebase-service-account.json')) {
+    serviceAccount = require('/etc/secrets/firebase-service-account.json');
+    console.log("✅ Firebase: Usando Secret File de Render");
+  } 
+  // OPCIÓN 2: Variable de entorno (fallback)
+  else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    console.log("✅ Firebase: Usando variable de entorno");
+  } 
+  // OPCIÓN 3: Archivo local (desarrollo)
+  else {
+    serviceAccount = require("./firebase-service-account.json");
+    console.log("✅ Firebase: Usando archivo local (desarrollo)");
+  }
+  
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  
+  console.log("✅ Firebase Admin SDK inicializado correctamente");
+} catch (err) {
+  console.error("⚠️  Error al inicializar Firebase Admin:");
+  console.error("   ", err.message);
+  console.error("");
+  console.error("📋 Soluciones:");
+  console.error("   - En Render: Agrega Secret File 'firebase-service-account.json'");
+  console.error("   - Localmente: Crea archivo firebase-service-account.json");
+  throw err;
+}
+// =====================================================
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===================== CONFIG =====================
-const ADMIN_USER = process.env.ADMIN_USER || "admin";
-const ADMIN_PASS = process.env.ADMIN_PASS || "quiniela2025";
-
+// ===================== DATABASE CONFIG =====================
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
@@ -25,16 +67,31 @@ app.use(session({
   cookie: { maxAge: 8 * 60 * 60 * 1000 }
 }));
 
-// Middleware de autenticación
+// =====================================================
+// 🔐 MIDDLEWARE DE AUTENTICACIÓN (ACTUALIZADO PARA FIREBASE)
+// =====================================================
 app.use((req, res, next) => {
-  const openPaths = ["/api/login", "/api/me", "/login.html", "/login.css", "/login.js", "/logo.png", "/logo.jpeg"];
+  // Rutas públicas que NO requieren autenticación
+  const openPaths = [
+    "/api/firebase-login",      // ← NUEVO: Login con Firebase
+    "/api/firebase-register",   // ← NUEVO: Registro con Firebase
+    "/api/check-email",          // ← NUEVO: Verificar si email está autorizado
+    "/api/me",
+    "/login.html",
+    "/firebase-config.js"        // ← NUEVO: Config de Firebase para frontend
+  ];
+  
   const openExtensions = [".png", ".jpg", ".jpeg", ".ico", ".svg", ".webp", ".css", ".js", ".woff", ".woff2"];
   const isOpenAsset = openExtensions.some(ext => req.path.endsWith(ext));
-  if (openPaths.includes(req.path) || isOpenAsset || req.session.authenticated) return next();
+  
+  // Ahora verificamos req.session.user en lugar de req.session.authenticated
+  if (openPaths.includes(req.path) || isOpenAsset || req.session.user) return next();
+  
   if (req.path.startsWith("/api/")) return res.status(401).json({ error: "No autenticado" });
   if (req.accepts("html")) return res.redirect("/login.html");
   res.status(401).json({ error: "No autenticado" });
 });
+// =====================================================
 
 app.use(express.static("public"));
 
@@ -63,10 +120,24 @@ async function initDB() {
       excluded_players TEXT DEFAULT ''
     )
   `);
+  
   // Migrate existing tables if columns missing
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS active INTEGER DEFAULT 1`);
   await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS round_number TEXT`);
   await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS excluded_players TEXT DEFAULT ''`);
+  
+  // ========================================
+  // 🔥 NUEVAS COLUMNAS PARA FIREBASE
+  // ========================================
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS email TEXT`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS firebase_uid TEXT`);
+  await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'player'`);
+  
+  // Índices para mejorar rendimiento
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_players_email ON players(email)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_players_firebase_uid ON players(firebase_uid)`);
+  // ========================================
+  
   await pool.query(`
     CREATE TABLE IF NOT EXISTS predictions (
       id SERIAL PRIMARY KEY,
@@ -77,7 +148,8 @@ async function initDB() {
       UNIQUE(week_id, player_id)
     )
   `);
-    await pool.query(`
+  
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS teams (
       id SERIAL PRIMARY KEY,
       slug TEXT UNIQUE NOT NULL,
@@ -85,30 +157,242 @@ async function initDB() {
       active INTEGER DEFAULT 1
     )
   `);
+  
   await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS home_team_id INTEGER`);
   await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS away_team_id INTEGER`);
+  
   console.log("✅ Base de datos lista");
 }
 
-// ===================== AUTH =====================
-app.post("/api/login", (req, res) => {
-  const { username, password } = req.body;
-  if (username === ADMIN_USER && password === ADMIN_PASS) {
-    req.session.authenticated = true;
-    res.json({ success: true });
-  } else {
-    res.status(401).json({ error: "Usuario o contraseña incorrectos" });
+// =====================================================
+// 🔥 ENDPOINTS DE AUTENTICACIÓN CON FIREBASE
+// =====================================================
+
+// Verificar si un email está autorizado para registrarse
+app.post("/api/check-email", async (req, res) => {
+  const { email } = req.body;
+  
+  try {
+    const { rows } = await pool.query(
+      "SELECT id, name FROM players WHERE email = $1 AND active = 1",
+      [email.toLowerCase().trim()]
+    );
+    
+    if (rows.length > 0) {
+      res.json({ 
+        allowed: true, 
+        playerId: rows[0].id,
+        playerName: rows[0].name 
+      });
+    } else {
+      res.json({ 
+        allowed: false, 
+        error: "Este email no está autorizado. Contacta con el administrador." 
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
+// Login con Firebase
+app.post("/api/firebase-login", async (req, res) => {
+  const { idToken } = req.body;
+  
+  try {
+    // Verificar el token de Firebase
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    const email = decodedToken.email;
+    
+    // Buscar el jugador en la base de datos
+    const { rows } = await pool.query(
+      "SELECT id, name, role, firebase_uid FROM players WHERE email = $1",
+      [email.toLowerCase()]
+    );
+    
+    if (rows.length === 0) {
+      return res.status(403).json({ 
+        error: "Tu email no está asociado a ningún jugador. Contacta con el administrador." 
+      });
+    }
+    
+    const player = rows[0];
+    
+    // Actualizar firebase_uid si no existe
+    if (!player.firebase_uid) {
+      await pool.query(
+        "UPDATE players SET firebase_uid = $1 WHERE id = $2",
+        [decodedToken.uid, player.id]
+      );
+    }
+    
+    // Crear sesión
+    req.session.user = {
+      playerId: player.id,
+      playerName: player.name,
+      role: player.role || 'player',
+      email: email,
+      firebaseUid: decodedToken.uid
+    };
+    
+    res.json({ 
+      success: true,
+      user: req.session.user
+    });
+    
+  } catch (err) {
+    console.error("Error en login:", err);
+    res.status(401).json({ error: "Token inválido o expirado" });
+  }
+});
+
+// Registro con Firebase
+app.post("/api/firebase-register", async (req, res) => {
+  const { idToken, email } = req.body;
+  
+  try {
+    // Verificar el token de Firebase
+    const decodedToken = await admin.auth().verifyIdToken(idToken);
+    
+    // Verificar que el email del token coincide con el enviado
+    if (decodedToken.email.toLowerCase() !== email.toLowerCase()) {
+      return res.status(400).json({ error: "El email no coincide" });
+    }
+    
+    // Buscar el jugador en la base de datos
+    const { rows } = await pool.query(
+      "SELECT id, name, role FROM players WHERE email = $1 AND active = 1",
+      [email.toLowerCase()]
+    );
+    
+    if (rows.length === 0) {
+      // Si no está asociado, eliminar cuenta de Firebase
+      await admin.auth().deleteUser(decodedToken.uid);
+      return res.status(403).json({ 
+        error: "Este email no está autorizado. Contacta con el administrador." 
+      });
+    }
+    
+    const player = rows[0];
+    
+    // Guardar el firebase_uid en la base de datos
+    await pool.query(
+      "UPDATE players SET firebase_uid = $1 WHERE id = $2",
+      [decodedToken.uid, player.id]
+    );
+    
+    // Crear sesión
+    req.session.user = {
+      playerId: player.id,
+      playerName: player.name,
+      role: player.role || 'player',
+      email: email.toLowerCase(),
+      firebaseUid: decodedToken.uid
+    };
+    
+    res.json({ 
+      success: true,
+      playerName: player.name,
+      user: req.session.user
+    });
+    
+  } catch (err) {
+    console.error("Error en registro:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Logout
 app.post("/api/logout", (req, res) => {
   req.session.destroy();
   res.json({ success: true });
 });
 
+// Obtener información del usuario actual
 app.get("/api/me", (req, res) => {
-  res.json({ authenticated: !!req.session.authenticated });
+  if (req.session.user) {
+    res.json({ 
+      authenticated: true,
+      ...req.session.user
+    });
+  } else {
+    res.json({ authenticated: false });
+  }
 });
+
+// ========================================
+// 🔥 GESTIÓN DE USUARIOS (SOLO ADMIN)
+// ========================================
+
+// Asociar email a un jugador (solo admin)
+app.post("/api/associate-email", async (req, res) => {
+  // Verificar que el usuario es admin
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
+  
+  const { player_id, email } = req.body;
+  
+  if (!player_id || !email) {
+    return res.status(400).json({ error: "Datos incompletos" });
+  }
+  
+  try {
+    // Verificar que el email no esté ya asociado a otro jugador
+    const { rows: existing } = await pool.query(
+      "SELECT id, name FROM players WHERE email = $1 AND id != $2",
+      [email.toLowerCase().trim(), player_id]
+    );
+    
+    if (existing.length > 0) {
+      return res.status(400).json({ 
+        error: `Este email ya está asociado a ${existing[0].name}` 
+      });
+    }
+    
+    // Asociar el email al jugador
+    await pool.query(
+      "UPDATE players SET email = $1 WHERE id = $2",
+      [email.toLowerCase().trim(), player_id]
+    );
+    
+    res.json({ success: true });
+    
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Cambiar rol de un jugador (solo admin)
+app.post("/api/change-role", async (req, res) => {
+  // Verificar que el usuario es admin
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
+  
+  const { player_id, role } = req.body;
+  
+  if (!player_id || !role || !['admin', 'player'].includes(role)) {
+    return res.status(400).json({ error: "Datos inválidos" });
+  }
+  
+  try {
+    await pool.query(
+      "UPDATE players SET role = $1 WHERE id = $2",
+      [role, player_id]
+    );
+    
+    res.json({ success: true });
+    
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================================================
+// FIN DE ENDPOINTS DE FIREBASE
+// A partir de aquí, todo el código es IGUAL que antes
+// =====================================================
 
 // ===================== PLAYERS =====================
 app.post("/add-player", async (req, res) => {
@@ -185,7 +469,6 @@ app.post("/new-week", async (req, res) => {
 app.get("/current-week", async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM weeks WHERE finished = 0 ORDER BY id DESC LIMIT 1");
   if (rows[0]) return res.json(rows[0]);
-  // No active week — return pending pot from last finished week
   const { rows: lastRows } = await pool.query("SELECT next_pot FROM weeks WHERE finished = 1 ORDER BY id DESC LIMIT 1");
   res.json({ none: true, pending_pot: lastRows[0]?.next_pot || 0 });
 });
@@ -229,6 +512,18 @@ app.get("/predictions/:week_id", async (req, res) => {
 app.post("/predict", async (req, res) => {
   const { week_id, player_id, result } = req.body;
   if (!week_id || !player_id || !result) return res.status(400).json({ error: "Datos incompletos" });
+  
+  // ========================================
+  // 🔥 CONTROL DE PERMISOS
+  // ========================================
+  // Si el usuario NO es admin, solo puede apostar por sí mismo
+  if (req.session.user && req.session.user.role !== 'admin') {
+    if (parseInt(player_id) !== req.session.user.playerId) {
+      return res.status(403).json({ error: "Solo puedes hacer tu propia apuesta" });
+    }
+  }
+  // ========================================
+  
   try {
     const { rows: weekRows } = await pool.query("SELECT * FROM weeks WHERE id = $1", [week_id]);
     if (!weekRows.length) return res.status(404).json({ error: "Semana no encontrada" });
@@ -261,7 +556,6 @@ app.post("/close-week", async (req, res) => {
   try {
     await client.query("BEGIN");
 
-    // Lock the row — si otra transacción ya la está cerrando, esto espera o falla
     const { rows: weekRows } = await client.query("SELECT * FROM weeks WHERE id = $1 AND finished = 0 FOR UPDATE", [week_id]);
     if (!weekRows.length) {
       await client.query("ROLLBACK");
@@ -270,7 +564,6 @@ app.post("/close-week", async (req, res) => {
     const week = weekRows[0];
     const excludedIds = week.excluded_players ? week.excluded_players.split(",").filter(Boolean).map(Number) : [];
 
-    // Only count active, non-excluded players for pot
     const { rows: activePlayers } = await client.query(
       "SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC",
       [excludedIds.length ? excludedIds : [0]]
@@ -288,7 +581,6 @@ app.post("/close-week", async (req, res) => {
       [real_result.trim(), amountPerPerson, newPot, nextPot, week_id]
     );
 
-    // Rotación: solo entre jugadores activos no excluidos
     const { rows: allActivePlayers } = await client.query(
       "SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC",
       [excludedIds.length ? excludedIds : [0]]
@@ -321,7 +613,6 @@ app.get("/history", async (req, res) => {
     const limit = parseInt(req.query.limit) || 5;
     const offset = parseInt(req.query.offset) || 0;
 
-    // Get total count for frontend pagination
     const { rows: countRows } = await pool.query("SELECT COUNT(*) as total FROM weeks WHERE finished = 1");
     const total = parseInt(countRows[0].total);
 
@@ -356,7 +647,6 @@ app.get("/history", async (req, res) => {
       const excludedIds = w.excluded_players ? w.excluded_players.split(",").filter(Boolean).map(Number) : [];
       const excludedNames = excludedIds.map(id => allPlayers.find(p => p.id === id)?.name).filter(Boolean);
       const weekPayments = allPayments.filter(p => p.week_id === w.id);
-      // Only show payments for players who actually bet this week
       const playersWhoBet = preds.map(pr => ({ id: pr.player_id, name: pr.player_name }));
       const payments = playersWhoBet.map(p => ({
         player_id: p.id,
@@ -386,11 +676,8 @@ app.get("/history", async (req, res) => {
 // ===================== RANKINGS =====================
 app.get("/rankings", async (req, res) => {
   try {
-    // Get all players (active and inactive for historical records)
     const { rows: allPlayers } = await pool.query("SELECT * FROM players ORDER BY order_position ASC, id ASC");
-    // Get all finished weeks with excluded_players info
     const { rows: finishedWeeks } = await pool.query("SELECT * FROM weeks WHERE finished = 1");
-    // Get all predictions with week result
     const { rows: allPreds } = await pool.query(`
       SELECT pr.*, w.real_result, w.pot, w.finished, w.excluded_players
       FROM predictions pr
@@ -399,8 +686,6 @@ app.get("/rankings", async (req, res) => {
     `);
 
     const rankings = allPlayers.map(player => {
-      // Weeks where the player was NOT excluded and was active at the time
-      // (we approximate "active at time" as: they have a prediction OR they were not excluded)
       const activeWeeks = finishedWeeks.filter(w => {
         const excluded = w.excluded_players ? w.excluded_players.split(",").filter(Boolean).map(Number) : [];
         return !excluded.includes(player.id);
@@ -412,10 +697,8 @@ app.get("/rankings", async (req, res) => {
         .filter(pr => pr.result === pr.real_result)
         .reduce((sum, pr) => sum + (parseInt(pr.pot) || 0), 0);
 
-      // total_predictions = weeks player actually participated (had a prediction)
       const totalPredictions = playerPreds.length;
 
-      // money_spent = sum of weekly_amount for each week the player bet
       const moneySpent = playerPreds.reduce((sum, pr) => {
         const week = finishedWeeks.find(w => w.id === pr.week_id);
         return sum + (parseInt(week?.weekly_amount) || 1);
@@ -450,7 +733,6 @@ app.get("/payments/:week_id", async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    // Table might not exist yet
     res.json([]);
   }
 });
@@ -507,7 +789,14 @@ app.post("/api/import", async (req, res) => {
     await pool.query("DELETE FROM teams");
 
     for (const p of players) {
-      await pool.query("INSERT INTO players (id, name, order_position, active) VALUES ($1, $2, $3, $4)", [p.id, p.name, p.order_position, p.active ?? 1]);
+      // ========================================
+      // 🔥 IMPORTAR TAMBIÉN LOS NUEVOS CAMPOS
+      // ========================================
+      await pool.query(
+        "INSERT INTO players (id, name, order_position, active, email, firebase_uid, role) VALUES ($1, $2, $3, $4, $5, $6, $7)", 
+        [p.id, p.name, p.order_position, p.active ?? 1, p.email || null, p.firebase_uid || null, p.role || 'player']
+      );
+      // ========================================
     }
     for (const w of weeks) {
       await pool.query(
@@ -641,7 +930,8 @@ app.post("/delete-team", async (req, res) => {
 initDB().then(() => {
   app.listen(PORT, () => {
     console.log(`✅ Servidor en http://localhost:${PORT}`);
-    console.log(`🔐 Login: ${ADMIN_USER} / ${ADMIN_PASS}`);
+    console.log(`🔐 Sistema de autenticación: Firebase`);
+    console.log(`📧 Admin inicial: lucas@idsplus.net`);
   });
 }).catch(err => {
   console.error("❌ Error conectando a la base de datos:", err);

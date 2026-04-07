@@ -212,6 +212,31 @@
       </div>
     </div>
 
+    <!-- 👤 USUARIOS (SOLO ADMIN) -->
+    <div class="drawer-group">
+      <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
+        <span>👤 Usuarios</span>
+        <span class="drawer-group-chevron">▾</span>
+      </div>
+      <div class="drawer-group-body">
+        <div class="drawer-section">
+          <h3>📧 Asociar Email a Jugador</h3>
+          <p class="info-note">Solo los emails asociados pueden registrarse en la app</p>
+          <div class="input-col">
+            <select id="userPlayerSelect" style="margin-bottom:8px">
+              <option value="">Selecciona un jugador...</option>
+            </select>
+            <input type="email" id="userEmail" placeholder="email@ejemplo.com">
+            <button type="button" class="btn btn-blue" onclick="associateEmail()">Asociar Email</button>
+          </div>
+        </div>
+        <div class="drawer-section" style="border-bottom:none">
+          <h3>👥 Lista de Usuarios</h3>
+          <div id="usersList" class="users-list"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ⚠️ ZONA PELIGRO -->
     <div class="drawer-group">
       <div class="drawer-group-header danger" onclick="this.parentElement.classList.toggle('open')">

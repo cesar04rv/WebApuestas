@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PorraPLUS ELITE — Login</title>
-    <link rel="shortcut icon" href="logo.png" type="image/x-icon">
+  <link rel="shortcut icon" href="logo.png" type="image/x-icon">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;600&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet">
   <style>
@@ -20,7 +20,6 @@
       color: white;
     }
 
-    /* pitch lines bg */
     body::before {
       content: '';
       position: fixed;
@@ -79,6 +78,47 @@
       margin-top: 4px;
     }
 
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .tab {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.1);
+      color: #6b7a99;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Barlow Condensed', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .tab:hover {
+      border-color: rgba(255,255,255,0.2);
+      color: #fff;
+    }
+
+    .tab.active {
+      background: #00c853;
+      border-color: #00c853;
+      color: black;
+    }
+
+    .form-view {
+      display: none;
+    }
+
+    .form-view.active {
+      display: block;
+    }
+
     .field {
       margin-bottom: 16px;
     }
@@ -108,8 +148,9 @@
     }
 
     input:focus { border-color: #00c853; }
+    input:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    .btn-login {
+    .btn-submit {
       width: 100%;
       margin-top: 8px;
       padding: 14px;
@@ -124,19 +165,75 @@
       transition: all 0.2s;
     }
 
-    .btn-login:hover { background: #00e65c; transform: translateY(-1px); }
-    .btn-login:active { transform: translateY(0); }
+    .btn-submit:hover { background: #00e65c; transform: translateY(-1px); }
+    .btn-submit:active { transform: translateY(0); }
+    .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-    .error-msg {
-      background: rgba(244,67,54,0.12);
-      border: 1px solid rgba(244,67,54,0.3);
-      color: #f44336;
+    .forgot-link {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #6b7a99;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .forgot-link:hover {
+      color: #00c853;
+    }
+
+    .message {
       border-radius: 8px;
       padding: 10px 14px;
       font-size: 13px;
       margin-top: 14px;
       text-align: center;
       display: none;
+    }
+
+    .message.error {
+      background: rgba(244,67,54,0.12);
+      border: 1px solid rgba(244,67,54,0.3);
+      color: #f44336;
+    }
+
+    .message.success {
+      background: rgba(0,200,83,0.12);
+      border: 1px solid rgba(0,200,83,0.3);
+      color: #00c853;
+    }
+
+    .message.info {
+      background: rgba(33,150,243,0.12);
+      border: 1px solid rgba(33,150,243,0.3);
+      color: #2196f3;
+    }
+
+    .back-to-login {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      font-size: 13px;
+      color: #6b7a99;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .back-to-login:hover {
+      color: #00c853;
+    }
+
+    .loading {
+      display: none;
+      text-align: center;
+      margin-top: 14px;
+      font-size: 13px;
+      color: #6b7a99;
+    }
+
+    .loading.active {
+      display: block;
     }
   </style>
 </head>
@@ -148,57 +245,318 @@
       <div class="login-sub">ELITE · ACCESO</div>
     </div>
 
-    <div class="field">
-      <label>Usuario</label>
-      <input type="text" id="username" placeholder="Tu usuario" autocomplete="username">
+    <div class="tabs">
+      <button class="tab active" onclick="switchForm('login')">Entrar</button>
+      <button class="tab" onclick="switchForm('register')">Registro</button>
     </div>
 
-    <div class="field">
-      <label>Contraseña</label>
-      <input type="password" id="password" placeholder="••••••••" autocomplete="current-password">
+    <!-- LOGIN FORM -->
+    <div id="loginForm" class="form-view active">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="tu@email.com" autocomplete="email">
+      </div>
+
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      </div>
+
+      <button class="btn-submit" onclick="handleLogin()" id="loginBtn">ENTRAR</button>
+      <a href="#" class="forgot-link" onclick="switchForm('reset'); return false;">¿Olvidaste tu contraseña?</a>
+      
+      <div class="message error" id="loginError"></div>
+      <div class="loading" id="loginLoading">Iniciando sesión...</div>
     </div>
 
-    <button class="btn-login" onclick="doLogin()">ENTRAR</button>
-    <div class="error-msg" id="errorMsg"></div>
+    <!-- REGISTER FORM -->
+    <div id="registerForm" class="form-view">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="registerEmail" placeholder="tu@email.com" autocomplete="email">
+      </div>
+
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      </div>
+
+      <div class="field">
+        <label>Confirmar Contraseña</label>
+        <input type="password" id="registerPasswordConfirm" placeholder="Repite tu contraseña" autocomplete="new-password">
+      </div>
+
+      <button class="btn-submit" onclick="handleRegister()" id="registerBtn">REGISTRARSE</button>
+      
+      <div class="message error" id="registerError"></div>
+      <div class="message info" id="registerInfo"></div>
+      <div class="loading" id="registerLoading">Creando cuenta...</div>
+    </div>
+
+    <!-- RESET PASSWORD FORM -->
+    <div id="resetForm" class="form-view">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="resetEmail" placeholder="tu@email.com" autocomplete="email">
+      </div>
+
+      <button class="btn-submit" onclick="handleResetPassword()" id="resetBtn">ENVIAR EMAIL</button>
+      <span class="back-to-login" onclick="switchForm('login')">← Volver al login</span>
+      
+      <div class="message error" id="resetError"></div>
+      <div class="message success" id="resetSuccess"></div>
+      <div class="loading" id="resetLoading">Enviando email...</div>
+    </div>
   </div>
 
-  <script>
-    fetch("/api/me").then(r => r.json()).then(d => {
-      if (d.authenticated) window.location = "/";
+  <script type="module">
+    import { 
+      auth, 
+      signInWithEmailAndPassword,
+      createUserWithEmailAndPassword,
+      sendPasswordResetEmail,
+      onAuthStateChanged
+    } from './firebase-config.js';
+
+    // Check if already authenticated
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // User is signed in, redirect to main app
+        window.location.href = '/';
+      }
     });
 
-    document.addEventListener("keydown", e => {
-      if (e.key === "Enter") doLogin();
-    });
+    window.switchForm = function(formName) {
+      // Hide all forms
+      document.querySelectorAll('.form-view').forEach(f => f.classList.remove('active'));
+      document.querySelectorAll('.message').forEach(m => m.style.display = 'none');
+      document.querySelectorAll('.loading').forEach(l => l.classList.remove('active'));
+      
+      // Update tabs
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      
+      // Show selected form
+      if (formName === 'login') {
+        document.getElementById('loginForm').classList.add('active');
+        document.querySelectorAll('.tab')[0].classList.add('active');
+      } else if (formName === 'register') {
+        document.getElementById('registerForm').classList.add('active');
+        document.querySelectorAll('.tab')[1].classList.add('active');
+      } else if (formName === 'reset') {
+        document.getElementById('resetForm').classList.add('active');
+      }
+    };
 
-    async function doLogin() {
-      const username = document.getElementById("username").value.trim();
-      const password = document.getElementById("password").value;
-      const errEl = document.getElementById("errorMsg");
-      errEl.style.display = "none";
+    window.handleLogin = async function() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const errorEl = document.getElementById('loginError');
+      const loadingEl = document.getElementById('loginLoading');
+      const btn = document.getElementById('loginBtn');
 
-      if (!username || !password) {
-        errEl.textContent = "Introduce usuario y contraseña";
-        errEl.style.display = "block";
+      errorEl.style.display = 'none';
+
+      if (!email || !password) {
+        errorEl.textContent = 'Por favor introduce email y contraseña';
+        errorEl.style.display = 'block';
         return;
       }
 
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password })
-      });
+      try {
+        btn.disabled = true;
+        loadingEl.classList.add('active');
 
-      const data = await res.json();
+        // Sign in with Firebase
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const idToken = await userCredential.user.getIdToken();
 
-      if (data.success) {
-        window.location = "/";
-      } else {
-        errEl.textContent = data.error || "Credenciales incorrectas";
-        errEl.style.display = "block";
-        document.getElementById("password").value = "";
+        // Send token to backend to create session
+        const response = await fetch('/api/firebase-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          window.location.href = '/';
+        } else {
+          throw new Error(data.error || 'Error al iniciar sesión');
+        }
+      } catch (error) {
+        console.error('Login error:', error);
+        let errorMessage = 'Error al iniciar sesión';
+        
+        if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+          errorMessage = 'Email o contraseña incorrectos';
+        } else if (error.code === 'auth/user-not-found') {
+          errorMessage = 'No existe una cuenta con este email';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMessage = 'Email inválido';
+        } else if (error.code === 'auth/too-many-requests') {
+          errorMessage = 'Demasiados intentos. Intenta más tarde';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        errorEl.textContent = errorMessage;
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        loadingEl.classList.remove('active');
       }
-    }
+    };
+
+    window.handleRegister = async function() {
+      const email = document.getElementById('registerEmail').value.trim();
+      const password = document.getElementById('registerPassword').value;
+      const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+      const errorEl = document.getElementById('registerError');
+      const infoEl = document.getElementById('registerInfo');
+      const loadingEl = document.getElementById('registerLoading');
+      const btn = document.getElementById('registerBtn');
+
+      errorEl.style.display = 'none';
+      infoEl.style.display = 'none';
+
+      if (!email || !password || !passwordConfirm) {
+        errorEl.textContent = 'Por favor completa todos los campos';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      if (password !== passwordConfirm) {
+        errorEl.textContent = 'Las contraseñas no coinciden';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      if (password.length < 6) {
+        errorEl.textContent = 'La contraseña debe tener al menos 6 caracteres';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        btn.disabled = true;
+        loadingEl.classList.add('active');
+
+        // Check if email is associated with a player
+        const checkResponse = await fetch('/api/check-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email })
+        });
+
+        const checkData = await checkResponse.json();
+
+        if (!checkData.allowed) {
+          throw new Error(checkData.error || 'Este email no está autorizado para registrarse. Contacta con el administrador.');
+        }
+
+        // Create Firebase account
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const idToken = await userCredential.user.getIdToken();
+
+        // Send token to backend to complete registration
+        const response = await fetch('/api/firebase-register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ idToken, email })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          infoEl.textContent = `¡Bienvenid@ ${data.playerName}! Redirigiendo...`;
+          infoEl.style.display = 'block';
+          setTimeout(() => {
+            window.location.href = '/';
+          }, 1500);
+        } else {
+          throw new Error(data.error || 'Error al completar el registro');
+        }
+      } catch (error) {
+        console.error('Register error:', error);
+        let errorMessage = 'Error al registrarse';
+        
+        if (error.code === 'auth/email-already-in-use') {
+          errorMessage = 'Ya existe una cuenta con este email';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMessage = 'Email inválido';
+        } else if (error.code === 'auth/weak-password') {
+          errorMessage = 'La contraseña es muy débil';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        errorEl.textContent = errorMessage;
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        loadingEl.classList.remove('active');
+      }
+    };
+
+    window.handleResetPassword = async function() {
+      const email = document.getElementById('resetEmail').value.trim();
+      const errorEl = document.getElementById('resetError');
+      const successEl = document.getElementById('resetSuccess');
+      const loadingEl = document.getElementById('resetLoading');
+      const btn = document.getElementById('resetBtn');
+
+      errorEl.style.display = 'none';
+      successEl.style.display = 'none';
+
+      if (!email) {
+        errorEl.textContent = 'Por favor introduce tu email';
+        errorEl.style.display = 'block';
+        return;
+      }
+
+      try {
+        btn.disabled = true;
+        loadingEl.classList.add('active');
+
+        await sendPasswordResetEmail(auth, email);
+
+        successEl.textContent = '✓ Email enviado. Revisa tu bandeja de entrada';
+        successEl.style.display = 'block';
+        document.getElementById('resetEmail').value = '';
+
+        setTimeout(() => {
+          switchForm('login');
+        }, 3000);
+      } catch (error) {
+        console.error('Reset error:', error);
+        let errorMessage = 'Error al enviar el email';
+        
+        if (error.code === 'auth/user-not-found') {
+          errorMessage = 'No existe una cuenta con este email';
+        } else if (error.code === 'auth/invalid-email') {
+          errorMessage = 'Email inválido';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        errorEl.textContent = errorMessage;
+        errorEl.style.display = 'block';
+      } finally {
+        btn.disabled = false;
+        loadingEl.classList.remove('active');
+      }
+    };
+
+    // Allow Enter key to submit
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const activeForm = document.querySelector('.form-view.active');
+        if (activeForm.id === 'loginForm') handleLogin();
+        else if (activeForm.id === 'registerForm') handleRegister();
+        else if (activeForm.id === 'resetForm') handleResetPassword();
+      }
+    });
   </script>
 </body>
 </html>
