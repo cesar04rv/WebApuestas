@@ -1,0 +1,68 @@
+--Hacer estas migraciones en NEON.
+ALTER TABLE players ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS firebase_uid TEXT;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS role TEXT DEFAULT 'player';
+CREATE INDEX IF NOT EXISTS idx_players_email ON players(email);
+CREATE INDEX IF NOT EXISTS idx_players_firebase_uid ON players(firebase_uid);
+UPDATE players SET email = 'lucas@idsplus.net', role = 'admin' WHERE id = 2; (o el id que tenga lucas en la bd)
+
+--Verificar cambios
+SELECT id, name, email, role, active FROM players ORDER BY id;
+Debería salir Lucas con email y rol admin.
+
+--Crear Proyecto en Firebase
+
+Ve a Firebase Console
+Click en Agregar proyecto
+Nombre del proyecto: loginwebapuestas (o el que prefieras)
+Desactiva Google Analytics
+Click Crear proyecto
+
+
+--Configurar Firebase Authentication
+En tu proyecto Firebase -> Authentication (menú lateral)
+Click en Comenzar
+Habilita Correo electrónico/contraseña
+NO habilites Vínculo de correo electrónico
+Click en "Guardar"
+
+
+Obtener Credenciales de Firebase
+A) Configuración Web (firebase-config.js)
+
+En Firebase Console → Configuración del proyecto (ajustes,  arriba a la izquierda)
+Scroll down -> Tus apps -> Click en el ícono </> (Web)
+Nombre de la app: PorraPLUS Web
+No marques Firebase Hosting
+Click en Registrar app
+Copia el objeto firebaseConfig (será algo como esto):
+
+javascriptconst firebaseConfig = {
+  apiKey: "AIzaSy...",
+  authDomain: "tu-proyecto.firebaseapp.com",
+  projectId: "tu-proyecto",
+  storageBucket: "tu-proyecto.appspot.com",
+  messagingSenderId: "123456789",
+  appId: "1:123456789:web:abc123"
+};
+
+Pega esa configuración en tu archivo public/firebase-config.js (ya existe en el repo)
+
+B) Service Account para Backend
+
+En Firebase Console -> Configuración del proyecto -> Cuentas de servicio
+Click en "Generar nueva clave privada"
+Se descargará un archivo JSON (ej: tu-proyecto-firebase-adminsdk-xxxxx.json)
+Este archivo tiene datos privados, no lo subas
+
+Configurar Render
+Subir el Service Account como Secret File:
+
+Ve a tu servicio en Render
+Environment -> Scroll down -> Secret Files
+Click en "Add Secret File"
+Filename: /etc/secrets/firebase-service-account.json
+Contents: Pega todo el contenido del JSON que descargaste
+Click en "Save Changes"
+
+Nunca se sube este archivo con los datos a ningún sitio público
