@@ -14,6 +14,11 @@ let showActiveOnly = true;
 let editExcludedPlayers = [];
 let teams = [];
 
+// =====================================================
+// 🔥 FIREBASE: Info del usuario actual
+// =====================================================
+let currentUser = null; // {playerId, playerName, role, email}
+
 // ===================== INIT =====================
 let isRedirecting = false;
 
@@ -27,6 +32,29 @@ let isRedirecting = false;
       }
       return;
     }
+    
+    // =====================================================
+    // 🔥 FIREBASE: Guardar info del usuario
+    // =====================================================
+    currentUser = {
+      playerId: me.playerId,
+      playerName: me.playerName,
+      role: me.role,
+      email: me.email
+    };
+    
+    // Mostrar mensaje de bienvenida en consola
+    if (currentUser.playerName) {
+      console.log(`👋 Bienvenid@ ${currentUser.playerName} (${currentUser.role})`);
+    }
+    
+    // 🔥 FIREBASE: Ocultar botón Admin si no es admin
+    if (currentUser.role !== 'admin') {
+      const adminBtn = document.querySelector('.btn-admin-toggle');
+      if (adminBtn) adminBtn.style.display = 'none';
+    }
+    // =====================================================
+    
     loadData();
   } catch(e) {
     console.error("Error checking auth:", e);
