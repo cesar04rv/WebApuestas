@@ -1333,7 +1333,7 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // =====================================================
-// 🔥 FIREBASE: GESTIÓN DE USUARIOS (SOLO ADMIN)
+//  FIREBASE: GESTIÓN DE USUARIOS (SOLO ADMIN)
 // =====================================================
 
 function renderUserManagement() {
@@ -1384,6 +1384,24 @@ async function associateEmail() {
 async function changeUserRole(playerId, newRole) {
   const player = players.find(p => p.id === playerId);
   if (!player) return;
+  
+  // =====================================================
+  // 🔒 SEGURIDAD: Validaciones antes de cambiar rol
+  // =====================================================
+  
+  // 1. NO puedes quitarte admin a ti mismo
+  if (newRole === 'player' && playerId === currentUser.playerId) {
+    return toast("❌ No puedes quitarte permisos de admin a ti mismo", "error");
+  }
+  
+  // 2. NO puedes quitar admin si es el último admin
+  if (newRole === 'player') {
+    const adminCount = players.filter(p => p.role === 'admin').length;
+    if (adminCount <= 1) {
+      return toast("❌ No puedes quitar el último administrador. Haz admin a alguien más primero.", "error");
+    }
+  }
+  // =====================================================
   
   const confirmMsg = newRole === 'admin' 
     ? `¿Hacer a ${player.name} administrador? Tendrá acceso total al panel de administración.`
