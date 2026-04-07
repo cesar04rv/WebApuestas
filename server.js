@@ -6,46 +6,82 @@ const bodyParser = require("body-parser");
 const session = require("express-session");
 
 // =====================================================
-// 🔥 FIREBASE ADMIN SDK (RENDER SECRET FILES)
+// 🔥 FIREBASE ADMIN SDK (RENDER SECRET FILES - MEJORADO)
 // =====================================================
-// Necesario para validar tokens de Firebase Authentication
 const admin = require("firebase-admin");
 const fs = require("fs");
+const path = require("path");
 
 try {
   let serviceAccount;
+  const secretFilePath = '/etc/secrets/firebase-service-account.json';
+  const localFilePath = path.join(__dirname, 'firebase-service-account.json');
   
-  // OPCIÓN 1: Secret Files de Render (RECOMENDADO)
-  // En Render Dashboard → Environment → Secret Files → Add Secret File
-  // Filename: firebase-service-account.json
-  // Contents: Pega el JSON completo del Service Account Key
-  if (fs.existsSync('/etc/secrets/firebase-service-account.json')) {
-    serviceAccount = require('/etc/secrets/firebase-service-account.json');
-    console.log("✅ Firebase: Usando Secret File de Render");
+  console.log("🔍 Buscando Service Account Key...");
+  
+  // OPCIÓN 1: Secret Files de Render
+  if (fs.existsSync(secretFilePath)) {
+    console.log("📁 Encontrado Secret File en:", secretFilePath);
+    
+    try {
+      const fileContent = fs.readFileSync(secretFilePath, 'utf8');
+      console.log("📄 Contenido leído, longitud:", fileContent.length, "caracteres");
+      
+      // Intentar parsear el JSON
+      serviceAccount = JSON.parse(fileContent);
+      
+      // Verificar que tiene las propiedades necesarias
+      if (!serviceAccount.project_id) {
+        throw new Error("El JSON no contiene 'project_id'. Verifica el formato del Secret File.");
+      }
+      if (!serviceAccount.private_key) {
+        throw new Error("El JSON no contiene 'private_key'. Verifica el formato del Secret File.");
+      }
+      
+      console.log("✅ Firebase: Secret File parseado correctamente");
+      console.log("📧 Project ID:", serviceAccount.project_id);
+      console.log("👤 Client Email:", serviceAccount.client_email);
+      
+    } catch (parseError) {
+      console.error("❌ Error al parsear el Secret File:");
+      console.error("   ", parseError.message);
+      throw new Error("Secret File tiene formato JSON inválido. Verifica que esté bien formateado.");
+    }
   } 
-  // OPCIÓN 2: Variable de entorno (fallback)
+  // OPCIÓN 2: Variable de entorno
   else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.log("📁 Encontrado en: variable de entorno");
     serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
     console.log("✅ Firebase: Usando variable de entorno");
   } 
-  // OPCIÓN 3: Archivo local (desarrollo)
-  else {
-    serviceAccount = require("./firebase-service-account.json");
+  // OPCIÓN 3: Archivo local
+  else if (fs.existsSync(localFilePath)) {
+    console.log("📁 Encontrado en:", localFilePath);
+    serviceAccount = require(localFilePath);
     console.log("✅ Firebase: Usando archivo local (desarrollo)");
   }
+  else {
+    throw new Error("No se encontró el Service Account Key en ninguna ubicación");
+  }
   
+  // Inicializar Firebase Admin
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount)
   });
   
   console.log("✅ Firebase Admin SDK inicializado correctamente");
+  
 } catch (err) {
   console.error("⚠️  Error al inicializar Firebase Admin:");
   console.error("   ", err.message);
   console.error("");
   console.error("📋 Soluciones:");
-  console.error("   - En Render: Agrega Secret File 'firebase-service-account.json'");
-  console.error("   - Localmente: Crea archivo firebase-service-account.json");
+  console.error("   1. Ve a Render → Environment → Secret Files");
+  console.error("   2. Edita 'firebase-service-account.json'");
+  console.error("   3. Asegúrate de que el JSON esté EN UNA SOLA LÍNEA");
+  console.error("   4. O formateado correctamente con todos los campos");
+  console.error("");
+  
   throw err;
 }
 // =====================================================
