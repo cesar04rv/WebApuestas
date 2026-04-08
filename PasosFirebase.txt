@@ -30,7 +30,7 @@ Click en "Guardar"
 Obtener Credenciales de Firebase
 A) Configuración Web (firebase-config.js)
 
-En Firebase Console → Configuración del proyecto (ajustes,  arriba a la izquierda)
+En Firebase Console -> Configuración del proyecto (ajustes,  arriba a la izquierda)
 Scroll down -> Tus apps -> Click en el ícono </> (Web)
 Nombre de la app: PorraPLUS Web
 No marques Firebase Hosting
