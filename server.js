@@ -6,7 +6,7 @@ const bodyParser = require("body-parser");
 const session = require("express-session");
 
 // =====================================================
-// 🔥 FIREBASE ADMIN SDK (RENDER SECRET FILES - MEJORADO)
+//  FIREBASE ADMIN SDK (RENDER SECRET FILES - MEJORADO)
 // =====================================================
 const admin = require("firebase-admin");
 const fs = require("fs");
@@ -104,7 +104,7 @@ app.use(session({
 }));
 
 // =====================================================
-// 🔐 MIDDLEWARE DE AUTENTICACIÓN (ACTUALIZADO PARA FIREBASE)
+//  MIDDLEWARE DE AUTENTICACIÓN (ACTUALIZADO PARA FIREBASE)
 // =====================================================
 app.use((req, res, next) => {
   // Rutas públicas que NO requieren autenticación
@@ -163,7 +163,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS excluded_players TEXT DEFAULT ''`);
   
   // ========================================
-  // 🔥 NUEVAS COLUMNAS PARA FIREBASE
+  //  NUEVAS COLUMNAS PARA FIREBASE
   // ========================================
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS email TEXT`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS firebase_uid TEXT`);
@@ -201,7 +201,7 @@ async function initDB() {
 }
 
 // =====================================================
-// 🔥 ENDPOINTS DE AUTENTICACIÓN CON FIREBASE
+//  ENDPOINTS DE AUTENTICACIÓN CON FIREBASE
 // =====================================================
 
 // Verificar si un email está autorizado para registrarse
@@ -357,7 +357,7 @@ app.get("/api/me", (req, res) => {
 });
 
 // ========================================
-// 🔥 GESTIÓN DE USUARIOS (SOLO ADMIN)
+//  GESTIÓN DE USUARIOS (SOLO ADMIN)
 // ========================================
 
 // Asociar email a un jugador (solo admin)
@@ -572,7 +572,7 @@ app.post("/predict", async (req, res) => {
   if (!week_id || !player_id || !result) return res.status(400).json({ error: "Datos incompletos" });
   
   // ========================================
-  // 🔥 CONTROL DE PERMISOS
+  //  CONTROL DE PERMISOS
   // ========================================
   // Si el usuario NO es admin, solo puede apostar por sí mismo
   if (req.session.user && req.session.user.role !== 'admin') {
@@ -848,7 +848,7 @@ app.post("/api/import", async (req, res) => {
 
     for (const p of players) {
       // ========================================
-      // 🔥 IMPORTAR TAMBIÉN LOS NUEVOS CAMPOS
+      //  IMPORTAR TAMBIÉN LOS NUEVOS CAMPOS
       // ========================================
       await pool.query(
         "INSERT INTO players (id, name, order_position, active, email, firebase_uid, role) VALUES ($1, $2, $3, $4, $5, $6, $7)", 
