@@ -15,7 +15,7 @@ let editExcludedPlayers = [];
 let teams = [];
 
 // =====================================================
-// 🔥 FIREBASE: Info del usuario actual
+//  FIREBASE: Info del usuario actual
 // =====================================================
 let currentUser = null; // {playerId, playerName, role, email}
 
@@ -34,7 +34,7 @@ let isRedirecting = false;
     }
     
     // =====================================================
-    // 🔥 FIREBASE: Guardar info del usuario
+    //  FIREBASE: Guardar info del usuario
     // =====================================================
     currentUser = {
       playerId: me.playerId,
@@ -48,7 +48,7 @@ let isRedirecting = false;
       console.log(`👋 Bienvenid@ ${currentUser.playerName} (${currentUser.role})`);
     }
     
-    // 🔥 FIREBASE: Ocultar botón Admin si no es admin
+    //  FIREBASE: Ocultar botón Admin si no es admin
     if (currentUser.role !== 'admin') {
       const adminBtn = document.querySelector('.btn-admin-toggle');
       if (adminBtn) adminBtn.style.display = 'none';
@@ -79,7 +79,7 @@ async function loadData() {
   document.getElementById("playersCount").textContent = players.filter(p => p.active).length;
   
   // =====================================================
-  // 🔥 FIREBASE: Renderizar gestión de usuarios si es admin
+  //  FIREBASE: Renderizar gestión de usuarios si es admin
   // =====================================================
   if (currentUser && currentUser.role === 'admin') {
     renderUserManagement();
