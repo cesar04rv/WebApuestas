@@ -399,68 +399,6 @@ app.post("/api/associate-email", async (req, res) => {
   }
 });
 
-// =====================================================
-// 🗑️ ELIMINAR EMAIL Y USUARIO DE FIREBASE
-// =====================================================
-app.post("/api/remove-email", async (req, res) => {
-  // Verificar que el usuario es admin
-  if (!req.session.user || req.session.user.role !== 'admin') {
-    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
-  }
-  
-  const { player_id } = req.body;
-  
-  if (!player_id) {
-    return res.status(400).json({ error: "Falta player_id" });
-  }
-  
-  try {
-    // 1. Obtener el firebase_uid del jugador
-    const { rows: playerRows } = await pool.query(
-      "SELECT firebase_uid, email, name FROM players WHERE id = $1",
-      [player_id]
-    );
-    
-    if (playerRows.length === 0) {
-      return res.status(404).json({ error: "Jugador no encontrado" });
-    }
-    
-    const player = playerRows[0];
-    
-    // 2. Si tiene firebase_uid, eliminar usuario de Firebase
-    if (player.firebase_uid) {
-      try {
-        await admin.auth().deleteUser(player.firebase_uid);
-        console.log(`✅ Usuario Firebase eliminado: ${player.email} (${player.name})`);
-      } catch (firebaseError) {
-        // Si el usuario ya no existe en Firebase, continuar
-        if (firebaseError.code === 'auth/user-not-found') {
-          console.log(`⚠️ Usuario ya no existe en Firebase: ${player.email}`);
-        } else {
-          console.error("Error al eliminar usuario de Firebase:", firebaseError);
-          // No detenemos el proceso, continuamos limpiando la BD
-        }
-      }
-    }
-    
-    // 3. Limpiar email y firebase_uid de la base de datos
-    await pool.query(
-      "UPDATE players SET email = NULL, firebase_uid = NULL WHERE id = $1",
-      [player_id]
-    );
-    
-    res.json({ 
-      success: true, 
-      message: `Email desvinculado y usuario Firebase eliminado` 
-    });
-    
-  } catch (err) {
-    console.error("Error en remove-email:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
-// =====================================================
-
 // Cambiar rol de un jugador (solo admin)
 app.post("/api/change-role", async (req, res) => {
   // Verificar que el usuario es admin
@@ -954,6 +892,169 @@ app.post("/api/reset", async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+
+// =====================================================
+// 🗳️ SISTEMA DE VOTACIÓN DE PARTIDOS
+// =====================================================
+
+// Obtener votación activa con opciones y votos
+app.get("/api/active-poll", async (req, res) => {
+  try {
+    // Buscar votación activa
+    const { rows: polls } = await pool.query(
+      "SELECT * FROM match_polls WHERE active = true ORDER BY id DESC LIMIT 1"
+    );
+    
+    if (polls.length === 0) {
+      return res.json({ active: false });
+    }
+    
+    const poll = polls[0];
+    
+    // Obtener opciones con información de equipos
+    const { rows: options } = await pool.query(`
+      SELECT 
+        po.id,
+        po.home_team_id,
+        po.away_team_id,
+        ht.name as home_team_name,
+        ht.slug as home_team_slug,
+        at.name as away_team_name,
+        at.slug as away_team_slug,
+        COUNT(pv.id) as votes
+      FROM poll_options po
+      LEFT JOIN teams ht ON po.home_team_id = ht.id
+      LEFT JOIN teams at ON po.away_team_id = at.id
+      LEFT JOIN poll_votes pv ON po.id = pv.option_id
+      WHERE po.poll_id = $1
+      GROUP BY po.id, ht.name, ht.slug, at.name, at.slug
+      ORDER BY po.id
+    `, [poll.id]);
+    
+    // Obtener quién ha votado (para mostrar check)
+    const { rows: votes } = await pool.query(
+      "SELECT player_id, option_id FROM poll_votes WHERE poll_id = $1",
+      [poll.id]
+    );
+    
+    res.json({
+      active: true,
+      poll: {
+        id: poll.id,
+        title: poll.title,
+        created_at: poll.created_at
+      },
+      options,
+      votes
+    });
+    
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Crear nueva votación (SOLO ADMIN)
+app.post("/api/create-poll", async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
+  
+  const { title, options } = req.body;
+  // options = [{home_team_id, away_team_id}, ...]
+  
+  if (!options || options.length === 0) {
+    return res.status(400).json({ error: "Debes agregar al menos un partido" });
+  }
+  
+  try {
+    // 1. Cerrar votaciones anteriores
+    await pool.query("UPDATE match_polls SET active = false WHERE active = true");
+    
+    // 2. Crear nueva votación
+    const { rows: pollRows } = await pool.query(
+      "INSERT INTO match_polls (title, active) VALUES ($1, true) RETURNING *",
+      [title || 'Vota el próximo partido']
+    );
+    
+    const pollId = pollRows[0].id;
+    
+    // 3. Insertar opciones
+    for (const opt of options) {
+      await pool.query(
+        "INSERT INTO poll_options (poll_id, home_team_id, away_team_id) VALUES ($1, $2, $3)",
+        [pollId, opt.home_team_id, opt.away_team_id]
+      );
+    }
+    
+    res.json({ success: true, poll_id: pollId });
+    
+  } catch (err) {
+    console.error("❌ Error creating poll:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Votar en una opción
+app.post("/api/vote-poll", async (req, res) => {
+  const { poll_id, option_id } = req.body;
+  const player_id = req.session.user.playerId;
+  
+  if (!poll_id || !option_id) {
+    return res.status(400).json({ error: "Datos incompletos" });
+  }
+  
+  try {
+    // Verificar que la votación está activa
+    const { rows: pollRows } = await pool.query(
+      "SELECT active FROM match_polls WHERE id = $1",
+      [poll_id]
+    );
+    
+    if (pollRows.length === 0 || !pollRows[0].active) {
+      return res.status(400).json({ error: "Esta votación ya no está activa" });
+    }
+    
+    // Verificar que la opción pertenece a esta votación
+    const { rows: optionRows } = await pool.query(
+      "SELECT id FROM poll_options WHERE id = $1 AND poll_id = $2",
+      [option_id, poll_id]
+    );
+    
+    if (optionRows.length === 0) {
+      return res.status(400).json({ error: "Opción no válida" });
+    }
+    
+    // Insertar o actualizar voto (UPSERT)
+    await pool.query(`
+      INSERT INTO poll_votes (poll_id, option_id, player_id)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (poll_id, player_id)
+      DO UPDATE SET option_id = $2
+    `, [poll_id, option_id, player_id]);
+    
+    res.json({ success: true });
+    
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Cerrar votación actual (SOLO ADMIN)
+app.post("/api/close-poll", async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
+  
+  try {
+    await pool.query("UPDATE match_polls SET active = false WHERE active = true");
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================================================
 
 
 // ===================== TEAMS =====================
