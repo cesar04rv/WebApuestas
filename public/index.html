@@ -61,6 +61,14 @@
     <button type="button" class="btn btn-share" onclick="captureAndShare()">📸 Compartir apuestas</button>
   </div>
 
+  <!-- 🗳️ VOTACIÓN DE PARTIDOS -->
+  <section class="card" id="pollCard" style="display:none">
+    <div class="card-header">
+      <h2>🗳️ <span id="pollCardTitle">Votación</span></h2>
+    </div>
+    <div id="pollCardBody" class="poll-voting-container"></div>
+  </section>
+
   <!-- 3. JUGADORES -->
   <section class="card">
     <div class="card-header">
@@ -112,7 +120,7 @@
   </div>
   <div class="drawer-body">
 
-    <!--  PARTIDOS -->
+    <!-- ⚽ PARTIDOS -->
     <div class="drawer-group open">
       <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
         <span>⚽ Partidos</span>
@@ -165,7 +173,7 @@
       </div>
     </div>
 
-    <!--  JUGADORES -->
+    <!-- 👥 JUGADORES -->
     <div class="drawer-group">
       <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
         <span>👥 Jugadores</span>
@@ -191,7 +199,7 @@
       </div>
     </div>
 
-    <!--  EQUIPOS -->
+    <!-- 🛡️ EQUIPOS -->
     <div class="drawer-group">
       <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
         <span>🛡️ Equipos</span>
@@ -212,7 +220,34 @@
       </div>
     </div>
 
-    <!-- USUARIOS (SOLO ADMIN) -->
+    <!-- 🗳️ VOTACIÓN DE PARTIDOS (SOLO ADMIN) -->
+    <div class="drawer-group">
+      <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
+        <span>🗳️ Votación de Partidos</span>
+        <span class="drawer-group-chevron">▾</span>
+      </div>
+      <div class="drawer-group-body">
+        <div class="drawer-section">
+          <h3>➕ Crear Nueva Votación</h3>
+          <p class="info-note">Los jugadores podrán votar por el partido que quieren jugar</p>
+          <div class="input-col">
+            <input type="text" id="pollTitle" placeholder="Título (opcional)" value="Vota el próximo partido">
+            <div id="pollOptionsContainer" style="display:flex;flex-direction:column;gap:8px;margin-bottom:8px">
+              <!-- Opciones de partidos se agregan aquí -->
+            </div>
+            <button type="button" class="btn btn-ghost" onclick="addPollOption()" style="width:100%;margin-bottom:8px">+ Añadir Partido</button>
+            <button type="button" class="btn btn-blue" onclick="createPoll()">Crear Votación</button>
+          </div>
+        </div>
+        <div class="drawer-section" style="border-bottom:none">
+          <h3>📊 Votación Actual</h3>
+          <div id="currentPollAdmin"></div>
+          <button type="button" class="btn btn-red-outline" onclick="closePoll()" id="closePollBtn" style="display:none;margin-top:10px">Cerrar Votación</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 👤 USUARIOS (SOLO ADMIN) -->
     <div class="drawer-group">
       <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
         <span>👤 Usuarios</span>
@@ -237,7 +272,7 @@
       </div>
     </div>
 
-    <!--  ZONA PELIGRO -->
+    <!-- ⚠️ ZONA PELIGRO -->
     <div class="drawer-group">
       <div class="drawer-group-header danger" onclick="this.parentElement.classList.toggle('open')">
         <span>⚠️ Zona Peligro</span>

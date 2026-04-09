@@ -68,6 +68,7 @@ async function loadData() {
   await loadWeek();
   await loadPredictions();
   await loadPayments();
+  await loadPoll();  // 🗳️ Cargar votación activa
   reorderList = []; // reset so renderReorder picks up fresh DB order
   calculateTurn();
   renderPlayers();
@@ -83,6 +84,7 @@ async function loadData() {
   // =====================================================
   if (currentUser && currentUser.role === 'admin') {
     renderUserManagement();
+    renderAdminPoll();  // 🗳️ Render admin poll view
   }
   // =====================================================
 }
@@ -1411,33 +1413,6 @@ async function changeUserRole(playerId, newRole) {
   });
 }
 
-// =====================================================
-//  ELIMINAR EMAIL Y USUARIO DE FIREBASE
-// =====================================================
-async function removeEmail(playerId, playerName) {
-  showModal({
-    icon: "🗑️",
-    title: "¿Eliminar email y cuenta Firebase?",
-    body: `Se eliminará el email de <strong>${playerName}</strong> y su cuenta en Firebase será borrada permanentemente.<br><br>El jugador tendrá que registrarse de nuevo si quiere volver a tener acceso.`,
-    confirmText: "Sí, eliminar",
-    danger: true,
-    onConfirm: async () => {
-      try {
-        const data = await post("/api/remove-email", { player_id: playerId });
-        if (data.error) {
-          return toast(data.error, "error");
-        }
-        toast(`✓ Email y cuenta Firebase de ${playerName} eliminados`, "success");
-        await loadPlayers();
-        renderUserManagement();
-      } catch (err) {
-        toast("Error al eliminar email", "error");
-      }
-    }
-  });
-}
-// =====================================================
-
 function renderUserList() {
   const container = document.getElementById("usersList");
   if (!container) return;
@@ -1459,10 +1434,7 @@ function renderUserList() {
     div.innerHTML = `
       <div class="user-info">
         <div class="user-name">${p.name}</div>
-        <div class="user-email">
-          ${p.email || '<span style="color:#6b7a99">Sin email asociado</span>'}
-          ${p.email ? `<button class="btn-mini-icon" onclick="removeEmail(${p.id}, '${p.name}')" title="Eliminar email y cuenta Firebase">🗑️</button>` : ''}
-        </div>
+        <div class="user-email">${p.email || '<span style="color:#6b7a99">Sin email asociado</span>'}</div>
       </div>
       <div class="user-actions">
         <span class="user-role-badge ${p.role === 'admin' ? 'admin' : ''}">${p.role === 'admin' ? 'ADMIN' : 'Jugador'}</span>
@@ -1478,4 +1450,249 @@ function renderUserList() {
   if (sorted.length === 0) {
     container.innerHTML = '<div style="padding:20px;text-align:center;color:#6b7a99;font-size:13px">No hay jugadores</div>';
   }
+}
+// =====================================================
+// 🗳️ SISTEMA DE VOTACIÓN DE PARTIDOS
+// =====================================================
+
+let currentPoll = null;
+let pollOptions = [];
+
+async function loadPoll() {
+  try {
+    const data = await api("/api/active-poll");
+    currentPoll = data.active ? data : null;
+    
+    if (currentPoll && currentPoll.active) {
+      pollOptions = data.options || [];
+      renderPublicPoll(data);
+    } else {
+      document.getElementById("pollCard").style.display = "none";
+    }
+  } catch(e) {
+    console.error("Error loading poll:", e);
+  }
+}
+
+function renderPublicPoll(data) {
+  const card = document.getElementById("pollCard");
+  const title = document.getElementById("pollCardTitle");
+  const body = document.getElementById("pollCardBody");
+  
+  if (!data || !data.active) {
+    card.style.display = "none";
+    return;
+  }
+  
+  card.style.display = "block";
+  title.textContent = data.poll.title;
+  
+  const myVote = data.votes.find(v => v.player_id === currentUser.playerId);
+  const hasVoted = !!myVote;
+  
+  let html = '<div class="poll-options-grid">';
+  
+  data.options.forEach(opt => {
+    const isMyVote = myVote && myVote.option_id === opt.id;
+    const percentage = data.votes.length > 0 ? Math.round((opt.votes / data.votes.length) * 100) : 0;
+    
+    html += `
+      <div class="poll-option ${isMyVote ? 'voted' : ''}" onclick="votePoll(${opt.id})">
+        <div class="poll-option-teams">
+          ${teamBadge(opt.home_team_slug, 32)}
+          <span class="poll-vs">vs</span>
+          ${teamBadge(opt.away_team_slug, 32)}
+        </div>
+        <div class="poll-option-names">
+          ${opt.home_team_name} - ${opt.away_team_name}
+        </div>
+        ${hasVoted ? `
+          <div class="poll-option-bar">
+            <div class="poll-option-bar-fill" style="width:${percentage}%"></div>
+          </div>
+          <div class="poll-option-votes">${opt.votes} ${opt.votes === 1 ? 'voto' : 'votos'} (${percentage}%)</div>
+        ` : ''}
+        ${isMyVote ? '<div class="poll-option-check">✓ Tu voto</div>' : ''}
+      </div>
+    `;
+  });
+  
+  html += '</div>';
+  
+  if (!hasVoted) {
+    html += '<p class="poll-note">👆 Click en un partido para votar</p>';
+  } else {
+    html += '<p class="poll-note">✓ Ya has votado. Puedes cambiar tu voto haciendo click en otro partido.</p>';
+  }
+  
+  body.innerHTML = html;
+}
+
+async function votePoll(optionId) {
+  if (!currentPoll || !currentPoll.active) {
+    return toast("Esta votación ya no está activa", "error");
+  }
+  
+  try {
+    const data = await post("/api/vote-poll", {
+      poll_id: currentPoll.poll.id,
+      option_id: optionId
+    });
+    
+    if (data.error) {
+      return toast(data.error, "error");
+    }
+    
+    toast("✓ Voto registrado", "success");
+    await loadPoll();
+    
+  } catch(err) {
+    toast("Error al votar", "error");
+  }
+}
+
+// =====================================================
+// 🗳️ ADMIN: Crear y gestionar votaciones
+// =====================================================
+
+let pollOptionCounter = 0;
+
+function addPollOption() {
+  pollOptionCounter++;
+  const container = document.getElementById("pollOptionsContainer");
+  
+  const div = document.createElement("div");
+  div.className = "poll-option-row";
+  div.id = `pollOption${pollOptionCounter}`;
+  div.innerHTML = `
+    <div class="team-selector-row">
+      <select class="team-select poll-home-select" data-option="${pollOptionCounter}">
+        <option value="">— Local —</option>
+        ${teams.filter(t => t.active).map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+      </select>
+      <span class="score-sep">vs</span>
+      <select class="team-select poll-away-select" data-option="${pollOptionCounter}">
+        <option value="">— Visitante —</option>
+        ${teams.filter(t => t.active).map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
+      </select>
+    </div>
+    <button type="button" class="btn-mini btn-red" onclick="removePollOption(${pollOptionCounter})" style="margin-top:4px">✕ Quitar</button>
+  `;
+  
+  container.appendChild(div);
+}
+
+function removePollOption(id) {
+  const elem = document.getElementById(`pollOption${id}`);
+  if (elem) elem.remove();
+}
+
+async function createPoll() {
+  const title = document.getElementById("pollTitle").value.trim() || "Vota el próximo partido";
+  
+  // Recoger opciones
+  const options = [];
+  const container = document.getElementById("pollOptionsContainer");
+  const rows = container.querySelectorAll(".poll-option-row");
+  
+  rows.forEach(row => {
+    const homeSelect = row.querySelector(".poll-home-select");
+    const awaySelect = row.querySelector(".poll-away-select");
+    const homeId = parseInt(homeSelect.value);
+    const awayId = parseInt(awaySelect.value);
+    
+    if (homeId && awayId) {
+      options.push({ home_team_id: homeId, away_team_id: awayId });
+    }
+  });
+  
+  if (options.length === 0) {
+    return toast("Añade al menos un partido para votar", "error");
+  }
+  
+  showModal({
+    icon: "🗳️",
+    title: "¿Crear votación?",
+    body: `Se creará una votación con <strong>${options.length} ${options.length === 1 ? 'partido' : 'partidos'}</strong>.<br><br>La votación anterior (si existe) se cerrará automáticamente.`,
+    confirmText: "Crear Votación",
+    danger: false,
+    onConfirm: async () => {
+      try {
+        const data = await post("/api/create-poll", { title, options });
+        if (data.error) {
+          return toast(data.error, "error");
+        }
+        toast("✓ Votación creada", "success");
+        document.getElementById("pollTitle").value = "Vota el próximo partido";
+        document.getElementById("pollOptionsContainer").innerHTML = "";
+        pollOptionCounter = 0;
+        await loadPoll();
+        if (currentUser.role === 'admin') renderAdminPoll();
+      } catch(err) {
+        toast("Error al crear votación", "error");
+      }
+    }
+  });
+}
+
+async function closePoll() {
+  showModal({
+    icon: "🔒",
+    title: "¿Cerrar votación?",
+    body: "La votación actual se cerrará y los jugadores no podrán votar más.",
+    confirmText: "Cerrar Votación",
+    danger: true,
+    onConfirm: async () => {
+      try {
+        await post("/api/close-poll", {});
+        toast("✓ Votación cerrada", "info");
+        await loadPoll();
+        if (currentUser.role === 'admin') renderAdminPoll();
+      } catch(err) {
+        toast("Error al cerrar votación", "error");
+      }
+    }
+  });
+}
+
+function renderAdminPoll() {
+  const container = document.getElementById("currentPollAdmin");
+  const btn = document.getElementById("closePollBtn");
+  
+  if (!currentPoll || !currentPoll.active) {
+    container.innerHTML = '<p class="empty-state" style="padding:12px 0;font-size:13px">No hay votación activa</p>';
+    btn.style.display = "none";
+    return;
+  }
+  
+  btn.style.display = "block";
+  
+  const totalVotes = currentPoll.votes.length;
+  const activePlayers = players.filter(p => p.active).length;
+  
+  let html = `
+    <div style="margin-bottom:10px">
+      <strong>${currentPoll.poll.title}</strong><br>
+      <span style="font-size:12px;color:var(--text-muted)">${totalVotes} de ${activePlayers} jugadores han votado</span>
+    </div>
+  `;
+  
+  pollOptions.forEach(opt => {
+    const percentage = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+    html += `
+      <div style="margin-bottom:8px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          ${teamBadge(opt.home_team_slug, 20)}
+          <span style="font-size:12px">${opt.home_team_name} vs ${opt.away_team_name}</span>
+          ${teamBadge(opt.away_team_slug, 20)}
+        </div>
+        <div style="background:rgba(255,255,255,0.05);height:6px;border-radius:3px;overflow:hidden">
+          <div style="background:var(--green);height:100%;width:${percentage}%"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${opt.votes} votos (${percentage}%)</div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
 }
