@@ -1506,10 +1506,12 @@ function renderPublicPoll(data) {
         <div class="poll-option-names">
           ${opt.home_team_name} - ${opt.away_team_name}
         </div>
-        <div class="poll-option-bar">
-          <div class="poll-option-bar-fill" style="width:${percentage}%"></div>
-        </div>
-        <div class="poll-option-votes">${opt.votes} ${opt.votes === 1 ? 'voto' : 'votos'} (${percentage}%)</div>
+        ${hasVoted ? `
+          <div class="poll-option-bar">
+            <div class="poll-option-bar-fill" style="width:${percentage}%"></div>
+          </div>
+          <div class="poll-option-votes">${opt.votes} ${opt.votes === 1 ? 'voto' : 'votos'} (${percentage}%)</div>
+        ` : ''}
         ${isMyVote ? '<div class="poll-option-check">✓ Tu voto</div>' : ''}
       </div>
     `;
