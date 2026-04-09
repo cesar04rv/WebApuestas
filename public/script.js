@@ -15,7 +15,7 @@ let editExcludedPlayers = [];
 let teams = [];
 
 // =====================================================
-//  FIREBASE: Info del usuario actual
+// 🔥 FIREBASE: Info del usuario actual
 // =====================================================
 let currentUser = null; // {playerId, playerName, role, email}
 
@@ -34,7 +34,7 @@ let isRedirecting = false;
     }
     
     // =====================================================
-    //  FIREBASE: Guardar info del usuario
+    // 🔥 FIREBASE: Guardar info del usuario
     // =====================================================
     currentUser = {
       playerId: me.playerId,
@@ -48,7 +48,7 @@ let isRedirecting = false;
       console.log(`👋 Bienvenid@ ${currentUser.playerName} (${currentUser.role})`);
     }
     
-    //  FIREBASE: Ocultar botón Admin si no es admin
+    // 🔥 FIREBASE: Ocultar botón Admin si no es admin
     if (currentUser.role !== 'admin') {
       const adminBtn = document.querySelector('.btn-admin-toggle');
       if (adminBtn) adminBtn.style.display = 'none';
@@ -79,7 +79,7 @@ async function loadData() {
   document.getElementById("playersCount").textContent = players.filter(p => p.active).length;
   
   // =====================================================
-  //  FIREBASE: Renderizar gestión de usuarios si es admin
+  // 🔥 FIREBASE: Renderizar gestión de usuarios si es admin
   // =====================================================
   if (currentUser && currentUser.role === 'admin') {
     renderUserManagement();
@@ -1385,24 +1385,6 @@ async function changeUserRole(playerId, newRole) {
   const player = players.find(p => p.id === playerId);
   if (!player) return;
   
-  // =====================================================
-  // 🔒 SEGURIDAD: Validaciones antes de cambiar rol
-  // =====================================================
-  
-  // 1. NO puedes quitarte admin a ti mismo
-  if (newRole === 'player' && playerId === currentUser.playerId) {
-    return toast("❌ No puedes quitarte permisos de admin a ti mismo", "error");
-  }
-  
-  // 2. NO puedes quitar admin si es el último admin
-  if (newRole === 'player') {
-    const adminCount = players.filter(p => p.role === 'admin').length;
-    if (adminCount <= 1) {
-      return toast("❌ No puedes quitar el último administrador. Haz admin a alguien más primero.", "error");
-    }
-  }
-  // =====================================================
-  
   const confirmMsg = newRole === 'admin' 
     ? `¿Hacer a ${player.name} administrador? Tendrá acceso total al panel de administración.`
     : `¿Quitar permisos de administrador a ${player.name}? Solo podrá hacer sus propias apuestas.`;
@@ -1429,6 +1411,33 @@ async function changeUserRole(playerId, newRole) {
   });
 }
 
+// =====================================================
+//  ELIMINAR EMAIL Y USUARIO DE FIREBASE
+// =====================================================
+async function removeEmail(playerId, playerName) {
+  showModal({
+    icon: "🗑️",
+    title: "¿Eliminar email y cuenta Firebase?",
+    body: `Se eliminará el email de <strong>${playerName}</strong> y su cuenta en Firebase será borrada permanentemente.<br><br>El jugador tendrá que registrarse de nuevo si quiere volver a tener acceso.`,
+    confirmText: "Sí, eliminar",
+    danger: true,
+    onConfirm: async () => {
+      try {
+        const data = await post("/api/remove-email", { player_id: playerId });
+        if (data.error) {
+          return toast(data.error, "error");
+        }
+        toast(`✓ Email y cuenta Firebase de ${playerName} eliminados`, "success");
+        await loadPlayers();
+        renderUserManagement();
+      } catch (err) {
+        toast("Error al eliminar email", "error");
+      }
+    }
+  });
+}
+// =====================================================
+
 function renderUserList() {
   const container = document.getElementById("usersList");
   if (!container) return;
@@ -1450,7 +1459,10 @@ function renderUserList() {
     div.innerHTML = `
       <div class="user-info">
         <div class="user-name">${p.name}</div>
-        <div class="user-email">${p.email || '<span style="color:#6b7a99">Sin email asociado</span>'}</div>
+        <div class="user-email">
+          ${p.email || '<span style="color:#6b7a99">Sin email asociado</span>'}
+          ${p.email ? `<button class="btn-mini-icon" onclick="removeEmail(${p.id}, '${p.name}')" title="Eliminar email y cuenta Firebase">🗑️</button>` : ''}
+        </div>
       </div>
       <div class="user-actions">
         <span class="user-role-badge ${p.role === 'admin' ? 'admin' : ''}">${p.role === 'admin' ? 'ADMIN' : 'Jugador'}</span>
