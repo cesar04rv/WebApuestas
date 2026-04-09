@@ -968,10 +968,13 @@ app.post("/api/create-poll", async (req, res) => {
   }
   
   try {
-    // 1. Cerrar votaciones anteriores
+    // 1. Eliminar votaciones cerradas antiguas
+    await pool.query("DELETE FROM match_polls WHERE active = false");
+    
+    // 2. Cerrar votación activa actual
     await pool.query("UPDATE match_polls SET active = false WHERE active = true");
     
-    // 2. Crear nueva votación
+    // 3. Crear nueva votación
     const { rows: pollRows } = await pool.query(
       "INSERT INTO match_polls (title, active) VALUES ($1, true) RETURNING *",
       [title || 'Vota el próximo partido']
@@ -979,7 +982,7 @@ app.post("/api/create-poll", async (req, res) => {
     
     const pollId = pollRows[0].id;
     
-    // 3. Insertar opciones
+    // 4. Insertar opciones
     for (const opt of options) {
       await pool.query(
         "INSERT INTO poll_options (poll_id, home_team_id, away_team_id) VALUES ($1, $2, $3)",
