@@ -6,7 +6,7 @@ const bodyParser = require("body-parser");
 const session = require("express-session");
 
 // =====================================================
-//  FIREBASE ADMIN SDK (RENDER SECRET FILES - MEJORADO)
+// 🔥 FIREBASE ADMIN SDK (RENDER SECRET FILES - MEJORADO)
 // =====================================================
 const admin = require("firebase-admin");
 const fs = require("fs");
@@ -104,7 +104,7 @@ app.use(session({
 }));
 
 // =====================================================
-//  MIDDLEWARE DE AUTENTICACIÓN (ACTUALIZADO PARA FIREBASE)
+// 🔐 MIDDLEWARE DE AUTENTICACIÓN (ACTUALIZADO PARA FIREBASE)
 // =====================================================
 app.use((req, res, next) => {
   // Rutas públicas que NO requieren autenticación
@@ -163,7 +163,7 @@ async function initDB() {
   await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS excluded_players TEXT DEFAULT ''`);
   
   // ========================================
-  //  NUEVAS COLUMNAS PARA FIREBASE
+  // 🔥 NUEVAS COLUMNAS PARA FIREBASE
   // ========================================
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS email TEXT`);
   await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS firebase_uid TEXT`);
@@ -201,7 +201,7 @@ async function initDB() {
 }
 
 // =====================================================
-//  ENDPOINTS DE AUTENTICACIÓN CON FIREBASE
+// 🔥 ENDPOINTS DE AUTENTICACIÓN CON FIREBASE
 // =====================================================
 
 // Verificar si un email está autorizado para registrarse
@@ -357,7 +357,7 @@ app.get("/api/me", (req, res) => {
 });
 
 // ========================================
-//  GESTIÓN DE USUARIOS (SOLO ADMIN)
+// 🔥 GESTIÓN DE USUARIOS (SOLO ADMIN)
 // ========================================
 
 // Asociar email a un jugador (solo admin)
@@ -399,6 +399,68 @@ app.post("/api/associate-email", async (req, res) => {
   }
 });
 
+// =====================================================
+// 🗑️ ELIMINAR EMAIL Y USUARIO DE FIREBASE
+// =====================================================
+app.post("/api/remove-email", async (req, res) => {
+  // Verificar que el usuario es admin
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
+  
+  const { player_id } = req.body;
+  
+  if (!player_id) {
+    return res.status(400).json({ error: "Falta player_id" });
+  }
+  
+  try {
+    // 1. Obtener el firebase_uid del jugador
+    const { rows: playerRows } = await pool.query(
+      "SELECT firebase_uid, email, name FROM players WHERE id = $1",
+      [player_id]
+    );
+    
+    if (playerRows.length === 0) {
+      return res.status(404).json({ error: "Jugador no encontrado" });
+    }
+    
+    const player = playerRows[0];
+    
+    // 2. Si tiene firebase_uid, eliminar usuario de Firebase
+    if (player.firebase_uid) {
+      try {
+        await admin.auth().deleteUser(player.firebase_uid);
+        console.log(`✅ Usuario Firebase eliminado: ${player.email} (${player.name})`);
+      } catch (firebaseError) {
+        // Si el usuario ya no existe en Firebase, continuar
+        if (firebaseError.code === 'auth/user-not-found') {
+          console.log(`⚠️ Usuario ya no existe en Firebase: ${player.email}`);
+        } else {
+          console.error("Error al eliminar usuario de Firebase:", firebaseError);
+          // No detenemos el proceso, continuamos limpiando la BD
+        }
+      }
+    }
+    
+    // 3. Limpiar email y firebase_uid de la base de datos
+    await pool.query(
+      "UPDATE players SET email = NULL, firebase_uid = NULL WHERE id = $1",
+      [player_id]
+    );
+    
+    res.json({ 
+      success: true, 
+      message: `Email desvinculado y usuario Firebase eliminado` 
+    });
+    
+  } catch (err) {
+    console.error("Error en remove-email:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+// =====================================================
+
 // Cambiar rol de un jugador (solo admin)
 app.post("/api/change-role", async (req, res) => {
   // Verificar que el usuario es admin
@@ -411,28 +473,6 @@ app.post("/api/change-role", async (req, res) => {
   if (!player_id || !role || !['admin', 'player'].includes(role)) {
     return res.status(400).json({ error: "Datos inválidos" });
   }
-  
-  // =====================================================
-  // 🔒 VALIDACIONES DE SEGURIDAD
-  // =====================================================
-  
-  // 1. NO puedes quitarte admin a ti mismo
-  if (role === 'player' && player_id === req.session.user.playerId) {
-    return res.status(400).json({ error: "No puedes quitarte permisos de admin a ti mismo" });
-  }
-  
-  // 2. NO puedes quitar admin si es el último admin
-  if (role === 'player') {
-    const adminCountResult = await pool.query(
-      "SELECT COUNT(*) as count FROM players WHERE role = 'admin'"
-    );
-    const adminCount = parseInt(adminCountResult.rows[0].count);
-    
-    if (adminCount <= 1) {
-      return res.status(400).json({ error: "No puedes quitar el último administrador. Haz admin a alguien más primero." });
-    }
-  }
-  // =====================================================
   
   try {
     await pool.query(
@@ -572,7 +612,7 @@ app.post("/predict", async (req, res) => {
   if (!week_id || !player_id || !result) return res.status(400).json({ error: "Datos incompletos" });
   
   // ========================================
-  //  CONTROL DE PERMISOS
+  // 🔥 CONTROL DE PERMISOS
   // ========================================
   // Si el usuario NO es admin, solo puede apostar por sí mismo
   if (req.session.user && req.session.user.role !== 'admin') {
@@ -848,7 +888,7 @@ app.post("/api/import", async (req, res) => {
 
     for (const p of players) {
       // ========================================
-      //  IMPORTAR TAMBIÉN LOS NUEVOS CAMPOS
+      // 🔥 IMPORTAR TAMBIÉN LOS NUEVOS CAMPOS
       // ========================================
       await pool.query(
         "INSERT INTO players (id, name, order_position, active, email, firebase_uid, role) VALUES ($1, $2, $3, $4, $5, $6, $7)", 
