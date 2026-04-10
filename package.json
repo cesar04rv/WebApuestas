@@ -1,7 +1,7 @@
 {
   "name": "quiniela-empresa",
   "version": "2.0.0",
-  "description": "Quiniela empresa con bote acumulable",
+  "description": "Quiniela empresa con bote acumulable y notificaciones por email",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -12,6 +12,8 @@
     "express": "^4.18.2",
     "express-session": "^1.17.3",
     "firebase-admin": "^13.7.0",
-    "pg": "^8.11.3"
+    "pg": "^8.11.3",
+    "mailgun.js": "^9.4.1",
+    "form-data": "^4.0.0"
   }
 }
