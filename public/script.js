@@ -1055,7 +1055,7 @@ async function captureAndShare() {
   document.body.appendChild(wrapper);
 
   try {
-    // 🔧 FIX: Convertir SVGs a PNG para móviles
+    //   Convertir SVGs a PNG para móviles
     const svgElements = wrapper.querySelectorAll('img[src$=".svg"]');
     const conversionPromises = [];
     
