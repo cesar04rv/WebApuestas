@@ -6,6 +6,15 @@ const bodyParser = require("body-parser");
 const session = require("express-session");
 
 // =====================================================
+// 📧 SERVICIO DE EMAILS CON MAILGUN
+// =====================================================
+const {
+  initMailgun,
+  sendPollToActivePlayers,
+  sendTurnToPlayer
+} = require("./mailgun-service");
+
+// =====================================================
 // 🔥 FIREBASE ADMIN SDK (RENDER SECRET FILES - MEJORADO)
 // =====================================================
 const admin = require("firebase-admin");
@@ -88,6 +97,11 @@ try {
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// =====================================================
+// 📧 Inicializar Mailgun
+// =====================================================
+initMailgun();
 
 // ===================== DATABASE CONFIG =====================
 const pool = new Pool({
@@ -573,7 +587,39 @@ app.post("/predict", async (req, res) => {
     const nextPlayer = players.find(p => !playerIdsWhoBet.has(p.id));
     if (!nextPlayer) return res.status(400).json({ error: "Todos ya han apostado" });
     if (parseInt(player_id) !== nextPlayer.id) return res.status(400).json({ error: "No es tu turno" });
+    
+    // Insertar predicción
     await pool.query("INSERT INTO predictions (week_id, player_id, result) VALUES ($1, $2, $3)", [week_id, player_id, result.trim()]);
+    
+    // 📧 NUEVO: Enviar email al siguiente jugador (asincrónico, sin esperar)
+    const currentPlayerIndex = players.findIndex(p => p.id === parseInt(player_id));
+    const nextPlayerToPlay = players[currentPlayerIndex + 1];
+    
+    if (nextPlayerToPlay) {
+      // Obtener info del partido
+      const homeTeamName = week.home_team_id 
+        ? (await pool.query("SELECT name FROM teams WHERE id = $1", [week.home_team_id])).rows[0]?.name || "Local"
+        : "Local";
+      const awayTeamName = week.away_team_id
+        ? (await pool.query("SELECT name FROM teams WHERE id = $1", [week.away_team_id])).rows[0]?.name || "Visitante"
+        : "Visitante";
+      
+      const matchInfo = week.match || `${homeTeamName} vs ${awayTeamName}`;
+      
+      // Enviar email sin esperar (async en background)
+      sendTurnToPlayer(pool, nextPlayerToPlay.id, matchInfo, homeTeamName, awayTeamName)
+        .then(success => {
+          if (success) {
+            console.log(`📧 Email de turno enviado a ${nextPlayerToPlay.name}`);
+          } else {
+            console.warn(`⚠️ Email de turno no enviado a ${nextPlayerToPlay.name}`);
+          }
+        })
+        .catch(err => {
+          console.error("❌ Error enviando email de turno:", err.message);
+        });
+    }
+    
     res.json({ success: true });
   } catch {
     res.status(400).json({ error: "Resultado ya elegido o jugador ya apostó" });
@@ -982,12 +1028,39 @@ app.post("/api/create-poll", async (req, res) => {
     
     const pollId = pollRows[0].id;
     
-    // 4. Insertar opciones
+    // 4. Insertar opciones y obtener información de equipos
+    const pollOptions = [];
     for (const opt of options) {
+      const { rows: teamData } = await pool.query(`
+        SELECT 
+          ht.name as home_team_name,
+          ht.slug as home_team_slug,
+          at.name as away_team_name,
+          at.slug as away_team_slug
+        FROM teams ht
+        JOIN teams at ON at.id = $2
+        WHERE ht.id = $1
+      `, [opt.home_team_id, opt.away_team_id]);
+      
+      if (teamData.length > 0) {
+        pollOptions.push(teamData[0]);
+      }
+      
       await pool.query(
         "INSERT INTO poll_options (poll_id, home_team_id, away_team_id) VALUES ($1, $2, $3)",
         [pollId, opt.home_team_id, opt.away_team_id]
       );
+    }
+    
+    // 5. 📧 Enviar emails a jugadores activos (async, sin esperar)
+    if (pollOptions.length > 0) {
+      sendPollToActivePlayers(pool, title || 'Vota el próximo partido', pollOptions)
+        .then(result => {
+          console.log(`📧 Votación enviada: ${result.sent} emails enviados, ${result.failed} fallidos`);
+        })
+        .catch(err => {
+          console.error("❌ Error enviando emails de votación:", err.message);
+        });
     }
     
     res.json({ success: true, poll_id: pollId });
