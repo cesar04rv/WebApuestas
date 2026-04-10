@@ -2,8 +2,8 @@
 // 📧 SERVICIO DE EMAILS CON MAILGUN
 // =====================================================
 
-const Mailgun = require('mailgun.js');
-const FormData = require('form-data');
+const Mailgun = require("mailgun.js");
+const FormData = require("form-data");
 
 let mailgunClient = null;
 
@@ -17,7 +17,10 @@ function initMailgun() {
 
   try {
     const mailgun = new Mailgun(FormData);
-    mailgunClient = mailgun.client({ key: process.env.MAILGUN_API_KEY });
+    mailgunClient = mailgun.client({
+      username: "api",
+      key: process.env.MAILGUN_API_KEY,
+    });
     console.log("✅ Mailgun inicializado correctamente");
     return mailgunClient;
   } catch (err) {
@@ -29,17 +32,27 @@ function initMailgun() {
 // =====================================================
 // 📧 ENVIAR EMAIL DE NUEVA VOTACIÓN
 // =====================================================
-async function sendPollNotification(playerEmail, playerName, pollTitle, pollOptions) {
+async function sendPollNotification(
+  playerEmail,
+  playerName,
+  pollTitle,
+  pollOptions,
+) {
   if (!mailgunClient) {
-    console.warn(`⚠️ Email no enviado a ${playerEmail} (Mailgun no configurado)`);
+    console.warn(
+      `⚠️ Email no enviado a ${playerEmail} (Mailgun no configurado)`,
+    );
     return false;
   }
 
   try {
     // Construir lista de opciones de partidos
     const optionsList = pollOptions
-      .map((opt, idx) => `${idx + 1}. ${opt.home_team_name} vs ${opt.away_team_name}`)
-      .join('<br>');
+      .map(
+        (opt, idx) =>
+          `${idx + 1}. ${opt.home_team_name} vs ${opt.away_team_name}`,
+      )
+      .join("<br>");
 
     const htmlContent = `
       <div style="font-family: Arial, sans-serif; color: #333; max-width: 600px; margin: 0 auto;">
@@ -62,7 +75,7 @@ async function sendPollNotification(playerEmail, playerName, pollTitle, pollOpti
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.APP_URL || 'https://tuapp.com'}" 
+            <a href="${process.env.APP_URL || "https://tuapp.com"}" 
                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                       color: white; 
                       padding: 12px 30px; 
@@ -89,9 +102,9 @@ Se ha abierto una nueva votación para decidir el próximo partido de la semana.
 ${pollTitle}
 
 Opciones:
-${pollOptions.map((opt, idx) => `${idx + 1}. ${opt.home_team_name} vs ${opt.away_team_name}`).join('\n')}
+${pollOptions.map((opt, idx) => `${idx + 1}. ${opt.home_team_name} vs ${opt.away_team_name}`).join("\n")}
 
-Ve a votar en: ${process.env.APP_URL || 'https://tuapp.com'}
+Ve a votar en: ${process.env.APP_URL || "https://tuapp.com"}
     `;
 
     await mailgunClient.messages.create(process.env.MAILGUN_DOMAIN, {
@@ -99,14 +112,16 @@ Ve a votar en: ${process.env.APP_URL || 'https://tuapp.com'}
       to: playerEmail,
       subject: `🗳️ ${pollTitle}`,
       html: htmlContent,
-      text: textContent
+      text: textContent,
     });
 
     console.log(`✅ Email de votación enviado a ${playerEmail}`);
     return true;
-
   } catch (err) {
-    console.error(`❌ Error enviando email de votación a ${playerEmail}:`, err.message);
+    console.error(
+      `❌ Error enviando email de votación a ${playerEmail}:`,
+      err.message,
+    );
     return false;
   }
 }
@@ -114,9 +129,17 @@ Ve a votar en: ${process.env.APP_URL || 'https://tuapp.com'}
 // =====================================================
 // 📧 ENVIAR EMAIL DE TURNO
 // =====================================================
-async function sendTurnNotification(playerEmail, playerName, matchInfo, homeTeam, awayTeam) {
+async function sendTurnNotification(
+  playerEmail,
+  playerName,
+  matchInfo,
+  homeTeam,
+  awayTeam,
+) {
   if (!mailgunClient) {
-    console.warn(`⚠️ Email no enviado a ${playerEmail} (Mailgun no configurado)`);
+    console.warn(
+      `⚠️ Email no enviado a ${playerEmail} (Mailgun no configurado)`,
+    );
     return false;
   }
 
@@ -164,7 +187,7 @@ async function sendTurnNotification(playerEmail, playerName, matchInfo, homeTeam
           </div>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${process.env.APP_URL || 'https://tuapp.com'}" 
+            <a href="${process.env.APP_URL || "https://tuapp.com"}" 
                style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                       color: white; 
                       padding: 14px 40px; 
@@ -201,7 +224,7 @@ Predice el marcador exacto del partido. Ejemplo: 2-1, 0-0, 3-2, etc.
 
 Nota: Completa tu apuesta cuando puedas. Los demás jugadores están esperando.
 
-Ve a apostar en: ${process.env.APP_URL || 'https://tuapp.com'}
+Ve a apostar en: ${process.env.APP_URL || "https://tuapp.com"}
 
 ---
 PorraPLUS ELITE • Tu quiniela semanal
@@ -212,14 +235,16 @@ PorraPLUS ELITE • Tu quiniela semanal
       to: playerEmail,
       subject: `⚽ ¡${playerName}, ES TU TURNO! - ${homeTeam} vs ${awayTeam}`,
       html: htmlContent,
-      text: textContent
+      text: textContent,
     });
 
     console.log(`✅ Email de turno enviado a ${playerEmail}`);
     return true;
-
   } catch (err) {
-    console.error(`❌ Error enviando email de turno a ${playerEmail}:`, err.message);
+    console.error(
+      `❌ Error enviando email de turno a ${playerEmail}:`,
+      err.message,
+    );
     return false;
   }
 }
@@ -251,7 +276,7 @@ async function sendPollToActivePlayers(pool, pollTitle, pollOptions) {
         player.email,
         player.name,
         pollTitle,
-        pollOptions
+        pollOptions,
       );
       if (success) {
         sent++;
@@ -259,12 +284,11 @@ async function sendPollToActivePlayers(pool, pollTitle, pollOptions) {
         failed++;
       }
       // Pequeño delay para evitar rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     console.log(`📊 Emails de votación: ${sent} enviados, ${failed} fallidos`);
     return { sent, failed };
-
   } catch (err) {
     console.error("❌ Error enviando emails de votación:", err.message);
     return { sent: 0, failed: 0 };
@@ -273,16 +297,21 @@ async function sendPollToActivePlayers(pool, pollTitle, pollOptions) {
 
 async function sendTurnToPlayer(pool, playerId, matchInfo, homeTeam, awayTeam) {
   if (!mailgunClient) {
-    console.warn(`⚠️ Email de turno no enviado para jugador ${playerId} (Mailgun no configurado)`);
+    console.warn(
+      `⚠️ Email de turno no enviado para jugador ${playerId} (Mailgun no configurado)`,
+    );
     return false;
   }
 
   try {
-    const { rows } = await pool.query(`
+    const { rows } = await pool.query(
+      `
       SELECT name, email 
       FROM players 
       WHERE id = $1 AND active = 1
-    `, [playerId]);
+    `,
+      [playerId],
+    );
 
     if (rows.length === 0) {
       console.warn(`⚠️ Jugador ${playerId} no encontrado o inactivo`);
@@ -301,11 +330,13 @@ async function sendTurnToPlayer(pool, playerId, matchInfo, homeTeam, awayTeam) {
       player.name,
       matchInfo,
       homeTeam,
-      awayTeam
+      awayTeam,
     );
-
   } catch (err) {
-    console.error(`❌ Error enviando email de turno al jugador ${playerId}:`, err.message);
+    console.error(
+      `❌ Error enviando email de turno al jugador ${playerId}:`,
+      err.message,
+    );
     return false;
   }
 }
@@ -315,5 +346,5 @@ module.exports = {
   sendPollNotification,
   sendTurnNotification,
   sendPollToActivePlayers,
-  sendTurnToPlayer
+  sendTurnToPlayer,
 };
