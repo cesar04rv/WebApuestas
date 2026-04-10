@@ -233,7 +233,7 @@ PorraPLUS ELITE • Tu quiniela semanal
     await mailgunClient.messages.create(process.env.MAILGUN_DOMAIN, {
       from: `PorraPLUS ELITE <noreply@${process.env.MAILGUN_DOMAIN}>`,
       to: playerEmail,
-      subject: `⚽ ¡${playerName}, ES TU TURNO! - ${homeTeam} vs ${awayTeam}`,
+      subject: `Tu turno: ${homeTeam} vs ${awayTeam}`,
       html: htmlContent,
       text: textContent,
     });
