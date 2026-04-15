@@ -23,8 +23,8 @@ Click Crear proyecto
 En tu proyecto Firebase -> Authentication (menú lateral)
 Click en Comenzar
 Habilita Correo electrónico/contraseña
-NO habilites Vínculo de correo electrónico
-Click en "Guardar"
+No habilitar Vínculo de correo electrónico
+Guardar
 
 
 Obtener Credenciales de Firebase
@@ -66,3 +66,92 @@ Contents: Pega todo el contenido del JSON que descargaste
 Click en "Save Changes"
 
 Nunca se sube este archivo con los datos a ningún sitio público
+
+
+--  SISTEMA DE VOTACIÓN DE PARTIDOS
+
+-- Tabla de votaciones activas
+CREATE TABLE IF NOT EXISTS match_polls (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT 'Vota el próximo partido',
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Tabla de opciones de votación (partidos disponibles)
+CREATE TABLE IF NOT EXISTS poll_options (
+  id SERIAL PRIMARY KEY,
+  poll_id INTEGER REFERENCES match_polls(id) ON DELETE CASCADE,
+  home_team_id INTEGER REFERENCES teams(id),
+  away_team_id INTEGER REFERENCES teams(id),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Tabla de votos
+CREATE TABLE IF NOT EXISTS poll_votes (
+  id SERIAL PRIMARY KEY,
+  poll_id INTEGER REFERENCES match_polls(id) ON DELETE CASCADE,
+  option_id INTEGER REFERENCES poll_options(id) ON DELETE CASCADE,
+  player_id INTEGER REFERENCES players(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(poll_id, player_id)  -- Un jugador solo puede votar una vez por votación
+);
+
+-- Índices para mejorar rendimiento
+CREATE INDEX IF NOT EXISTS idx_poll_options_poll_id ON poll_options(poll_id);
+CREATE INDEX IF NOT EXISTS idx_poll_votes_poll_id ON poll_votes(poll_id);
+CREATE INDEX IF NOT EXISTS idx_poll_votes_player_id ON poll_votes(player_id);
+
+-- Verificar tablas creadas
+SELECT table_name 
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+  AND table_name IN ('match_polls', 'poll_options', 'poll_votes')
+ORDER BY table_name;
+
+PASO 1: REGISTRARSE EN MAILGUN
+
+
+1. Ve a https://www.mailgun.com
+2. Click en "Sign Up"
+3. Crea cuenta con:
+   - Email
+   - Contraseña
+   - Nombre
+4. Verifica tu email
+5. Selecciona región (EU o US, según tu ubicación)
+6. Haz login
+
+IMPORTANTE: Te darán un dominio SANDBOX automáticamente
+Ejemplo: sandbox752c2f45ab7d4b18ae31d1d14f4658bb.mailgun.org
+
+
+PASO 2: OBTENER CREDENCIALES DE MAILGUN
+
+2.1 API Key Privada:
+   - En Mailgun dashboard
+   - Dashboard abajo a la derecha, API KEY, crear nueva API KEY
+   - PorraPlus de nombre
+   - Copia la "Private API Key" (es un string sin "key-" adelante)
+   - Ejemplo: 7407f66b90bb9d...
+
+2.2 Dominio:
+   - En Mailgun dashboard
+   - Panel izquierdo → "Sending" → "Domains"
+   - Verás tu dominio sandbox
+   - Cópialo exactamente
+   - Ejemplo: sandbox752c2f45ab7d4b18ae31d1d14f4658bb.mailgun.org
+
+
+PASO 3: AUTORIZAR EMAILS EN MAILGUN (IMPORTANTE para SANDBOX)
+
+El dominio SANDBOX solo puede enviar a direcciones autorizadas.
+
+3.1 Autorizar los emails:
+   - En Mailgun dashboard
+   - Click en tu dominio sandbox, está en la parte de abajo
+   - En la pestaña de setup 
+   - Click Add test email recipient
+   - Agrega los emails de los jugadores
+3.2 Repetir para cada email de prueba que uses
+
