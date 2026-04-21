@@ -1242,7 +1242,7 @@ app.post("/api/create-week-from-poll", async (req, res) => {
     
     // Crear nueva semana directamente con los datos
     const { rows: newWeek } = await pool.query(
-      "INSERT INTO weeks (home_team_id, away_team_id, round_number, match, match_date, active, finished) VALUES ($1, $2, $3, $4, $5, 1, 0) RETURNING *",
+      "INSERT INTO weeks (home_team_id, away_team_id, round_number, match, match_date, finished) VALUES ($1, $2, $3, $4, $5, 0) RETURNING *",
       [home_team_id, away_team_id, round_number, match_name || null, match_date || null]
     );
 
