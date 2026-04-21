@@ -1703,8 +1703,101 @@ async function closePoll() {
         toast("✓ Votación cerrada", "info");
         await loadPoll();
         if (currentUser.role === 'admin') renderAdminPoll();
+        
+        // Mostrar formulario para elegir ganador
+        setTimeout(() => showSetPollWinnerForm(), 500);
       } catch(err) {
         toast("Error al cerrar votación", "error");
+      }
+    }
+  });
+}
+
+// =====================================================
+// 🗳️ ESTABLECER GANADOR DE VOTACIÓN
+// =====================================================
+function showSetPollWinnerForm() {
+  const homeTeamSelect = document.getElementById("winnerHomeTeam");
+  const awayTeamSelect = document.getElementById("winnerAwayTeam");
+  
+  if (!homeTeamSelect || !awayTeamSelect) {
+    console.warn("Selectores de equipos no encontrados");
+    return;
+  }
+  
+  // Limpiar y llenar selectores
+  homeTeamSelect.innerHTML = '<option value="">Selecciona equipo local...</option>';
+  awayTeamSelect.innerHTML = '<option value="">Selecciona equipo visitante...</option>';
+  
+  teams.forEach(team => {
+    const option1 = document.createElement("option");
+    option1.value = team.id;
+    option1.textContent = team.name;
+    homeTeamSelect.appendChild(option1);
+    
+    const option2 = document.createElement("option");
+    option2.value = team.id;
+    option2.textContent = team.name;
+    awayTeamSelect.appendChild(option2);
+  });
+  
+  showModal({
+    icon: "⚽",
+    title: "Selecciona el partido ganador de la votación",
+    body: `
+      <div style="display:flex; flex-direction:column; gap:12px;">
+        <div>
+          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Local</label>
+          <select id="winnerHomeTeam" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0;">
+            <option value="">Selecciona equipo local...</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Visitante</label>
+          <select id="winnerAwayTeam" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0;">
+            <option value="">Selecciona equipo visitante...</option>
+          </select>
+        </div>
+        <div>
+          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28)</label>
+          <input type="text" id="winnerRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Nombre del partido (opcional)</label>
+          <input type="text" id="winnerMatch" placeholder="Real Madrid - Barcelona" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
+        </div>
+        <div>
+          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Fecha y hora (opcional)</label>
+          <input type="datetime-local" id="winnerDate" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
+        </div>
+      </div>
+    `,
+    confirmText: "Establecer Ganador",
+    danger: false,
+    onConfirm: async () => {
+      const homeTeamId = document.getElementById("winnerHomeTeam").value;
+      const awayTeamId = document.getElementById("winnerAwayTeam").value;
+      const round = document.getElementById("winnerRound").value.trim();
+      const matchName = document.getElementById("winnerMatch").value.trim();
+      const matchDate = document.getElementById("winnerDate").value;
+      
+      if (!homeTeamId || !awayTeamId || !round) {
+        return toast("Completa los campos requeridos", "error");
+      }
+      
+      const data = await post("/api/set-poll-winner", {
+        home_team_id: parseInt(homeTeamId),
+        away_team_id: parseInt(awayTeamId),
+        round_number: round,
+        match_name: matchName || null,
+        match_date: matchDate || null
+      });
+      
+      if (data.error) {
+        toast(data.error, "error");
+      } else {
+        toast("✓ Ganador de votación establecido", "success");
+        loadData();
       }
     }
   });
