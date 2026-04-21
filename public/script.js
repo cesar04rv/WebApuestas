@@ -663,7 +663,7 @@ function skipPlayer() {
   if (!currentTurnPlayer) return toast("No hay turno activo", "error");
 
   // Verificar que es Admin
-  if (userRole !== 'admin') {
+  if (!currentUser || currentUser.role !== 'admin') {
     return toast("Solo el admin puede saltar jugadores", "error");
   }
 
@@ -692,7 +692,7 @@ function skipPlayer() {
 function updateSkipPlayerButton() {
   const skipBtn = document.getElementById("skipPlayerBtn");
   if (skipBtn) {
-    skipBtn.style.display = (userRole === 'admin' && currentWeek && !currentWeek.finished) ? "block" : "none";
+    skipBtn.style.display = (currentUser && currentUser.role === 'admin' && currentWeek && !currentWeek.finished) ? "block" : "none";
   }
 }
 
@@ -700,7 +700,7 @@ function updateSkipPlayerButton() {
 function updateSkipPlayerButton() {
   const skipBtn = document.getElementById("skipPlayerBtn");
   if (skipBtn) {
-    skipBtn.style.display = (userRole === 'admin' && currentWeek && !currentWeek.finished) ? "block" : "none";
+    skipBtn.style.display = (currentUser && currentUser.role === 'admin' && currentWeek && !currentWeek.finished) ? "block" : "none";
   }
 }
 
