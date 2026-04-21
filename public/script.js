@@ -356,7 +356,9 @@ function getExcludedForCurrentWeek() {
 
 function getActivePlayers() {
   const excluded = getExcludedForCurrentWeek();
-  return players.filter(p => p.active && !excluded.includes(p.id));
+  return players
+    .filter(p => p.active && !excluded.includes(p.id))
+    .sort((a, b) => a.order_position - b.order_position);
 }
 
 // ===================== TURN =====================
