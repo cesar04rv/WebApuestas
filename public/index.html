@@ -43,19 +43,23 @@
   </section>
 
   <!-- 2. TURNO + APOSTAR -->
-  <section class="turn-banner" id="turnBanner">
-    <div class="turn-form">
-  <div class="score-input-group">
-    <input type="number" id="resultLocal" min="0" max="99" placeholder="0" autocomplete="off">
-    <span class="score-sep">—</span>
-    <input type="number" id="resultVisit" min="0" max="99" placeholder="0" autocomplete="off">
+<section class="turn-banner" id="turnBanner">
+  <div class="turn-inner">
+    <span class="turn-label">LE TOCA</span>
+    <span class="turn-name" id="currentTurnName">—</span>
   </div>
-  <div style="display: flex; gap: 8px;">
-    <button type="button" class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
-    <button type="button" class="btn btn-amber" id="skipPlayerBtn" onclick="skipPlayer()" style="display:none;">⏭️ SALTAR</button>
+  <div class="turn-form">
+    <div class="score-input-group">
+      <input type="number" id="resultLocal" min="0" max="99" placeholder="0" autocomplete="off">
+      <span class="score-sep">—</span>
+      <input type="number" id="resultVisit" min="0" max="99" placeholder="0" autocomplete="off">
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button type="button" class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
+      <button type="button" class="btn btn-amber" id="skipPlayerBtn" onclick="skipPlayer()" style="display:none;">⏭️ SALTAR</button>
+    </div>
   </div>
-</div>
-  </section>
+</section>
 
   <!-- SHARE BUTTON -->
   <div id="shareContainer" class="hidden" style="text-align:center;margin-top:-8px;">
