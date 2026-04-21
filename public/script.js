@@ -1763,6 +1763,11 @@ function showPollWinnerConfirmation(pollData, pollVotes) {
     ? `<strong>${homeTeam.name}</strong> vs <strong>${awayTeam.name}</strong>`
     : "Partido seleccionado";
 
+  // Guardar datos globales para el siguiente paso
+  window.selectedWinnerOption = winnerOption;
+  window.selectedHomeTeam = homeTeam;
+  window.selectedAwayTeam = awayTeam;
+
   showModal({
     icon: "⚽",
     title: "Ganador de la votación",
@@ -1776,8 +1781,8 @@ function showPollWinnerConfirmation(pollData, pollVotes) {
     confirmText: "Sí, crear semana con este",
     danger: false,
     onConfirm: () => {
-      // Mostrar formulario para rellenar jornada, fecha, etc.
-      showCreateWeekFromWinner(winnerOption);
+      // Mostrar formulario con datos precargados
+      showCreateWeekFromWinner();
     }
   });
 }
@@ -1785,10 +1790,17 @@ function showPollWinnerConfirmation(pollData, pollVotes) {
 // =====================================================
 // 🗳️ CREAR SEMANA CON DATOS PRE-CARGADOS
 // =====================================================
-function showCreateWeekFromWinner(winnerOption) {
-  const homeTeam = teams.find(t => t.id === winnerOption.home_team_id);
-  const awayTeam = teams.find(t => t.id === winnerOption.away_team_id);
-  const matchName = homeTeam && awayTeam ? `${homeTeam.name} - ${awayTeam.name}` : "";
+function showCreateWeekFromWinner() {
+  const winnerOption = window.selectedWinnerOption;
+  const homeTeam = window.selectedHomeTeam;
+  const awayTeam = window.selectedAwayTeam;
+
+  if (!winnerOption || !homeTeam || !awayTeam) {
+    toast("Error: datos no cargados", "error");
+    return;
+  }
+
+  const matchName = `${homeTeam.name} - ${awayTeam.name}`;
 
   showModal({
     icon: "✏️",
@@ -1820,19 +1832,24 @@ function showCreateWeekFromWinner(winnerOption) {
         return;
       }
       
-      const data = await post("/api/create-week-from-poll", {
-        home_team_id: winnerOption.home_team_id,
-        away_team_id: winnerOption.away_team_id,
-        round_number: round,
-        match_name: matchName || null,
-        match_date: matchDate || null
-      });
-      
-      if (data.error) {
-        toast(data.error, "error");
-      } else {
-        toast("✓ Semana creada desde votación", "success");
-        loadData();
+      try {
+        const data = await post("/api/create-week-from-poll", {
+          home_team_id: winnerOption.home_team_id,
+          away_team_id: winnerOption.away_team_id,
+          round_number: round,
+          match_name: matchName || null,
+          match_date: matchDate || null
+        });
+        
+        if (data.error) {
+          toast(data.error, "error");
+        } else {
+          toast("✓ Semana creada desde votación", "success");
+          loadData();
+        }
+      } catch (err) {
+        console.error("Error:", err);
+        toast("Error al crear semana", "error");
       }
     }
   });
