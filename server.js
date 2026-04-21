@@ -1223,9 +1223,9 @@ app.post("/api/close-poll", async (req, res) => {
 });
 
 // =====================================================
-// 🗳️ ESTABLECER GANADOR DE VOTACIÓN Y CREAR SEMANA
+// 🗳️ CERRAR VOTACIÓN Y CREAR SEMANA CON GANADOR
 // =====================================================
-app.post("/api/set-poll-winner", async (req, res) => {
+app.post("/api/create-week-from-poll", async (req, res) => {
   if (!req.session.user || req.session.user.role !== 'admin') {
     return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
   }
@@ -1237,25 +1237,18 @@ app.post("/api/set-poll-winner", async (req, res) => {
   }
 
   try {
-    // Obtener la votación activa (o la última)
-    const { rows: pollRows } = await pool.query(
-      "SELECT * FROM match_polls WHERE active = false ORDER BY id DESC LIMIT 1"
-    );
+    // Cerrar votación
+    await pool.query("UPDATE match_polls SET active = false WHERE active = true");
     
-    if (!pollRows.length) {
-      return res.status(404).json({ error: "No hay votación cerrada" });
-    }
-
-    const poll = pollRows[0];
-
-    // Guardar el ganador en la votación
-    await pool.query(
-      "UPDATE match_polls SET winning_home_team = $1, winning_away_team = $2, winning_round = $3, winning_match = $4, winning_date = $5 WHERE id = $6",
-      [home_team_id, away_team_id, round_number, match_name || null, match_date || null, poll.id]
+    // Crear nueva semana directamente con los datos
+    const { rows: newWeek } = await pool.query(
+      "INSERT INTO weeks (home_team_id, away_team_id, round_number, match, match_date, active, finished) VALUES ($1, $2, $3, $4, $5, 1, 0) RETURNING *",
+      [home_team_id, away_team_id, round_number, match_name || null, match_date || null]
     );
 
-    res.json({ success: true, message: "Ganador de votación establecido" });
+    res.json({ success: true, message: "Semana creada desde votación", week: newWeek[0] });
   } catch (err) {
+    console.error("Error:", err);
     res.status(500).json({ error: err.message });
   }
 });
