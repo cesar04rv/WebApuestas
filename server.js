@@ -738,7 +738,7 @@ app.post("/close-week", async (req, res) => {
       [real_result.trim(), amountPerPerson, newPot, nextPot, week_id]
     );
 
-    // Obtener TODOS los jugadores activos (incluyendo los saltados) en su orden original
+    // Obtener TODOS los jugadores activos en su orden original
     const { rows: allActivePlayers } = await client.query(
       "SELECT * FROM players WHERE active = 1 ORDER BY order_position ASC"
     );
@@ -746,40 +746,32 @@ app.post("/close-week", async (req, res) => {
     // Obtener solo los jugadores que NO fueron saltados
     const nonExcludedPlayers = allActivePlayers.filter(p => !excludedIds.includes(p.id));
     
-    // Encontrar cuál fue el último jugador que apostó en esta semana
+    // Encontrar cuál fue el último jugador que apostó
     const { rows: lastPrediction } = await client.query(
       "SELECT player_id FROM predictions WHERE week_id = $1 ORDER BY id DESC LIMIT 1",
       [week_id]
     );
     
-    let nextStartPosition = 1; // Por defecto, empieza en posición 1
+    let nextStartIndex = 0; // Por defecto, empieza en el primero
     
     if (lastPrediction.length > 0) {
-      // Encontrar la posición del último que apostó
+      // Encontrar el índice del último que apostó en nonExcludedPlayers
       const lastPlayerId = lastPrediction[0].player_id;
-      const lastPlayerPos = allActivePlayers.find(p => p.id === lastPlayerId)?.order_position;
+      const lastIndex = nonExcludedPlayers.findIndex(p => p.id === lastPlayerId);
       
-      if (lastPlayerPos) {
-        // La siguiente posición es la siguiente al último que apostó (en el orden original)
-        nextStartPosition = lastPlayerPos + 1;
-        
-        // Si se pasa del total, vuelve al principio
-        if (nextStartPosition > allActivePlayers.length) {
-          nextStartPosition = 1;
-        }
+      if (lastIndex >= 0) {
+        // El siguiente es el que viene después
+        nextStartIndex = (lastIndex + 1) % nonExcludedPlayers.length;
       }
     }
     
-    // Crear el nuevo orden: empezar desde nextStartPosition con los no excluidos
-    const newOrder = [];
-    for (let pos = nextStartPosition; newOrder.length < nonExcludedPlayers.length; pos++) {
-      if (pos > allActivePlayers.length) pos = 1;
-      const playerAtPos = allActivePlayers.find(p => p.order_position === pos);
-      if (playerAtPos && !excludedIds.includes(playerAtPos.id)) {
-        newOrder.push(playerAtPos);
-      }
-    }
+    // Crear nuevo orden: rotar desde nextStartIndex
+    const newOrder = [
+      ...nonExcludedPlayers.slice(nextStartIndex),
+      ...nonExcludedPlayers.slice(0, nextStartIndex)
+    ];
     
+    // Actualizar posiciones
     for (let i = 0; i < newOrder.length; i++) {
       await client.query("UPDATE players SET order_position = $1 WHERE id = $2", [i + 1, newOrder[i].id]);
     }
