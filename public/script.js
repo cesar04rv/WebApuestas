@@ -1714,7 +1714,7 @@ async function closePoll() {
 }
 
 // =====================================================
-// 🗳️ ESTABLECER GANADOR DE VOTACIÓN
+// 🗳️ ESTABLECER GANADOR Y CREAR SEMANA
 // =====================================================
 function showSetPollWinnerForm() {
   // Generar opciones de equipos
@@ -1722,18 +1722,18 @@ function showSetPollWinnerForm() {
   
   showModal({
     icon: "⚽",
-    title: "Selecciona el partido ganador de la votación",
+    title: "Crear semana desde ganador de votación",
     body: `
       <div style="display:flex; flex-direction:column; gap:12px; margin:10px 0;">
         <div>
-          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Local</label>
+          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Local *</label>
           <select id="winnerHomeTeam" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0;">
             <option value="">Selecciona equipo local...</option>
             ${teamOptions}
           </select>
         </div>
         <div>
-          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Visitante</label>
+          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Visitante *</label>
           <select id="winnerAwayTeam" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0;">
             <option value="">Selecciona equipo visitante...</option>
             ${teamOptions}
@@ -1753,7 +1753,7 @@ function showSetPollWinnerForm() {
         </div>
       </div>
     `,
-    confirmText: "Establecer Ganador",
+    confirmText: "Crear Semana",
     danger: false,
     onConfirm: async () => {
       const homeTeamId = document.getElementById("winnerHomeTeam").value;
@@ -1767,7 +1767,7 @@ function showSetPollWinnerForm() {
         return;
       }
       
-      const data = await post("/api/set-poll-winner", {
+      const data = await post("/api/create-week-from-poll", {
         home_team_id: parseInt(homeTeamId),
         away_team_id: parseInt(awayTeamId),
         round_number: round,
@@ -1778,7 +1778,7 @@ function showSetPollWinnerForm() {
       if (data.error) {
         toast(data.error, "error");
       } else {
-        toast("✓ Ganador de votación establecido", "success");
+        toast("✓ Semana creada desde votación", "success");
         loadData();
       }
     }
