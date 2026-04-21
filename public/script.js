@@ -58,7 +58,6 @@ let isRedirecting = false;
     loadData();
   } catch(e) {
     console.error("Error checking auth:", e);
-    updateSkipPlayerButton();
 
     // Don't redirect on network error, just show empty state
   }
@@ -89,6 +88,9 @@ async function loadData() {
     renderAdminPoll();  // 🗳️ Render admin poll view
   }
   // =====================================================
+  
+  // Mostrar/ocultar botón de saltar
+  updateSkipPlayerButton();
 }
 
 // ===================== FETCH =====================
@@ -686,14 +688,6 @@ function skipPlayer() {
       }
     }
   });
-}
-
-// Mostrar/ocultar botón de saltar según si es Admin
-function updateSkipPlayerButton() {
-  const skipBtn = document.getElementById("skipPlayerBtn");
-  if (skipBtn) {
-    skipBtn.style.display = (currentUser && currentUser.role === 'admin' && currentWeek && !currentWeek.finished) ? "block" : "none";
-  }
 }
 
 // Mostrar/ocultar botón de saltar según si es Admin
