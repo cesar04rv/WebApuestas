@@ -1701,12 +1701,18 @@ async function closePoll() {
       try {
         await post("/api/close-poll", {});
         toast("✓ Votación cerrada", "info");
+        
+        // Guardar datos de votación antes de recargar
+        const pollData = currentPoll;
+        const pollVotes = predictions ? [...predictions] : [];
+        
         await loadPoll();
         if (currentUser.role === 'admin') renderAdminPoll();
         
-        // Mostrar ganador y pedir confirmación
-        setTimeout(() => showPollWinnerConfirmation(), 500);
+        // Mostrar ganador con datos guardados
+        setTimeout(() => showPollWinnerConfirmation(pollData, pollVotes), 500);
       } catch(err) {
+        console.error("Error:", err);
         toast("Error al cerrar votación", "error");
       }
     }
@@ -1716,18 +1722,16 @@ async function closePoll() {
 // =====================================================
 // 🗳️ MOSTRAR GANADOR Y PEDIR CONFIRMACIÓN
 // =====================================================
-async function showPollWinnerConfirmation() {
-  // Obtener votación cerrada con resultados
-  const data = await api("/api/active-poll");
-  
-  if (!data || data.active) {
-    toast("Error: no hay votación cerrada", "error");
+function showPollWinnerConfirmation(pollData, pollVotes) {
+  if (!pollData || !pollData.options) {
+    console.error("No hay datos de votación");
+    toast("Error: no hay datos de votación", "error");
     return;
   }
 
   // Contar votos por opción
-  const options = data.options || [];
-  const votes = data.votes || [];
+  const options = pollData.options || [];
+  const votes = pollData.votes || [];
   
   const voteCount = {};
   options.forEach(opt => {
@@ -1745,6 +1749,11 @@ async function showPollWinnerConfirmation() {
       winnerOption = opt;
     }
   });
+
+  if (!winnerOption) {
+    toast("No hay opciones de votación", "error");
+    return;
+  }
 
   // Obtener nombres de equipos
   const homeTeam = teams.find(t => t.id === winnerOption.home_team_id);
