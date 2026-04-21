@@ -429,6 +429,14 @@ function togglePayment(playerId, currentPaid) {
   const player = players.find(p => p.id === playerId);
   if (!player) return;
 
+  // 🔒 VALIDACIÓN: Solo el jugador o el admin pueden marcar pagos
+  const isAdmin = currentUser && currentUser.role === 'admin';
+  const isSelf = currentUser && currentUser.playerId === playerId;
+
+  if (!isAdmin && !isSelf) {
+    return toast("Solo puedes marcar tus propios pagos", "error");
+  }
+
   if (!currentPaid) {
     // Confirmar pago
     showModal({
