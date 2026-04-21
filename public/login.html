@@ -319,10 +319,8 @@
       sendPasswordResetEmail,
       onAuthStateChanged
     } from './firebase-config.js';
-
-    // =====================================================
-    //  FIX: Verificar sesión del backend antes de redirigir
-    // =====================================================
+    
+    // Verificar sesión del backend antes de redirigir
     let isCheckingAuth = false;
     
     onAuthStateChanged(auth, async (user) => {
@@ -346,7 +344,7 @@
         isCheckingAuth = false;
       }
     });
-    // =====================================================
+
 
     window.switchForm = function(formName) {
       // Hide all forms
