@@ -656,7 +656,7 @@ function sendPrediction() {
 }
 
 // =====================================================
-// SALTAR JUGADOR (SOLO ADMIN)
+// ⏭️ SALTAR JUGADOR (SOLO ADMIN)
 // =====================================================
 function skipPlayer() {
   if (!currentWeek) return toast("No hay semana activa", "error");
@@ -686,6 +686,14 @@ function skipPlayer() {
       }
     }
   });
+}
+
+// Mostrar/ocultar botón de saltar según si es Admin
+function updateSkipPlayerButton() {
+  const skipBtn = document.getElementById("skipPlayerBtn");
+  if (skipBtn) {
+    skipBtn.style.display = (userRole === 'admin' && currentWeek && !currentWeek.finished) ? "block" : "none";
+  }
 }
 
 // Mostrar/ocultar botón de saltar según si es Admin
