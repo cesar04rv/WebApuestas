@@ -15,34 +15,6 @@ let editExcludedPlayers = [];
 let teams = [];
 
 // =====================================================
-// 🌙 TEMA OSCURO / DARK MODE (POR DEFECTO)
-// =====================================================
-function initTheme() {
-  const savedTheme = localStorage.getItem("theme") || "dark";
-  applyTheme(savedTheme);
-}
-
-function toggleTheme() {
-  const isLightMode = document.body.classList.contains("light-mode");
-  const newTheme = isLightMode ? "dark" : "light";
-  applyTheme(newTheme);
-}
-
-function applyTheme(theme) {
-  const themeBtn = document.getElementById("themeToggle");
-  
-  if (theme === "light") {
-    document.body.classList.add("light-mode");
-    localStorage.setItem("theme", "light");
-    if (themeBtn) themeBtn.textContent = "🌙";
-  } else {
-    document.body.classList.remove("light-mode");
-    localStorage.setItem("theme", "dark");
-    if (themeBtn) themeBtn.textContent = "☀️";
-  }
-}
-
-// =====================================================
 // 🔥 FIREBASE: Info del usuario actual
 // =====================================================
 let currentUser = null; // {playerId, playerName, role, email}
@@ -52,9 +24,6 @@ let isRedirecting = false;
 
 (async () => {
   try {
-    // 🌙 Inicializar tema
-    initTheme();
-    
     const me = await fetch("/api/me").then(r => r.json());
     if (!me || !me.authenticated) {
       if (!isRedirecting) {
