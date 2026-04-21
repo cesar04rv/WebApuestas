@@ -58,6 +58,8 @@ let isRedirecting = false;
     loadData();
   } catch(e) {
     console.error("Error checking auth:", e);
+    updateSkipPlayerButton();
+
     // Don't redirect on network error, just show empty state
   }
 })();
@@ -651,6 +653,47 @@ function sendPrediction() {
       }
     }
   });
+}
+
+// =====================================================
+// SALTAR JUGADOR (SOLO ADMIN)
+// =====================================================
+function skipPlayer() {
+  if (!currentWeek) return toast("No hay semana activa", "error");
+  if (!currentTurnPlayer) return toast("No hay turno activo", "error");
+
+  // Verificar que es Admin
+  if (userRole !== 'admin') {
+    return toast("Solo el admin puede saltar jugadores", "error");
+  }
+
+  showModal({
+    icon: "⏭️",
+    title: "¿Saltar jugador?",
+    body: `¿Estás seguro que quieres saltar a <strong>${currentTurnPlayer.name}</strong>? No jugará esta semana.`,
+    confirmText: "Sí, saltar",
+    danger: true,
+    onConfirm: async () => {
+      const data = await post("/skip-player", {
+        week_id: currentWeek.id,
+        player_id: currentTurnPlayer.id
+      });
+      if (data.error) {
+        toast(data.error, "error");
+      } else {
+        toast(`✓ ${currentTurnPlayer.name} saltado`, "success");
+        loadData();
+      }
+    }
+  });
+}
+
+// Mostrar/ocultar botón de saltar según si es Admin
+function updateSkipPlayerButton() {
+  const skipBtn = document.getElementById("skipPlayerBtn");
+  if (skipBtn) {
+    skipBtn.style.display = (userRole === 'admin' && currentWeek && !currentWeek.finished) ? "block" : "none";
+  }
 }
 
 async function addPlayer() {

@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PorraPLUS ELITE ⚽</title>
   <link rel="shortcut icon" href="logo.png" type="image/x-icon">
+  <link rel="apple-touch-icon" href="/logo180.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
@@ -42,18 +44,17 @@
 
   <!-- 2. TURNO + APOSTAR -->
   <section class="turn-banner" id="turnBanner">
-    <div class="turn-inner">
-      <span class="turn-label">LE TOCA</span>
-      <span class="turn-name" id="currentTurnName">—</span>
-    </div>
     <div class="turn-form">
-      <div class="score-input-group">
-        <input type="number" id="resultLocal" min="0" max="99" placeholder="0" autocomplete="off">
-        <span class="score-sep">—</span>
-        <input type="number" id="resultVisit" min="0" max="99" placeholder="0" autocomplete="off">
-      </div>
-      <button type="button" class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
-    </div>
+  <div class="score-input-group">
+    <input type="number" id="resultLocal" min="0" max="99" placeholder="0" autocomplete="off">
+    <span class="score-sep">—</span>
+    <input type="number" id="resultVisit" min="0" max="99" placeholder="0" autocomplete="off">
+  </div>
+  <div style="display: flex; gap: 8px;">
+    <button type="button" class="btn btn-primary" onclick="sendPrediction()">APOSTAR</button>
+    <button type="button" class="btn btn-amber" id="skipPlayerBtn" onclick="skipPlayer()" style="display:none;">⏭️ SALTAR</button>
+  </div>
+</div>
   </section>
 
   <!-- SHARE BUTTON -->
