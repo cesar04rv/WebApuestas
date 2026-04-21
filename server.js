@@ -752,32 +752,11 @@ app.post("/close-week", async (req, res) => {
       "SELECT * FROM players WHERE active = 1 ORDER BY order_position ASC"
     );
     
-    // Obtener solo los jugadores que NO fueron saltados
-    const nonExcludedPlayers = allActivePlayers.filter(p => !excludedIds.includes(p.id));
-    
-    // Encontrar cuál fue el último jugador que apostó
-    const { rows: lastPrediction } = await client.query(
-      "SELECT player_id FROM predictions WHERE week_id = $1 ORDER BY id DESC LIMIT 1",
-      [week_id]
-    );
-    
-    let nextStartIndex = 0; // Por defecto, empieza en el primero
-    
-    if (lastPrediction.length > 0) {
-      // Encontrar el índice del último que apostó en nonExcludedPlayers
-      const lastPlayerId = lastPrediction[0].player_id;
-      const lastIndex = nonExcludedPlayers.findIndex(p => p.id === lastPlayerId);
-      
-      if (lastIndex >= 0) {
-        // El siguiente es el que viene después
-        nextStartIndex = (lastIndex + 1) % nonExcludedPlayers.length;
-      }
-    }
-    
-    // Crear nuevo orden: rotar desde nextStartIndex
+    // Rotar TODOS los jugadores (incluyendo los que fueron saltados esta semana)
+    // El primero va al final, los demás avanzan un puesto
     const newOrder = [
-      ...nonExcludedPlayers.slice(nextStartIndex),
-      ...nonExcludedPlayers.slice(0, nextStartIndex)
+      ...allActivePlayers.slice(1),
+      allActivePlayers[0]
     ];
     
     // Actualizar posiciones
