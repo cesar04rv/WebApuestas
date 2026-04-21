@@ -742,7 +742,33 @@ app.post("/close-week", async (req, res) => {
       "SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC",
       [excludedIds.length ? excludedIds : [0]]
     );
-    const newOrder = [...allActivePlayers.slice(1), allActivePlayers[0]];
+    
+    // Encontrar cuál fue el último jugador que apostó en esta semana
+    const { rows: lastPrediction } = await client.query(
+      "SELECT player_id FROM predictions WHERE week_id = $1 ORDER BY id DESC LIMIT 1",
+      [week_id]
+    );
+    
+    let lastPlayerWhoBetrIndex = -1;
+    if (lastPrediction.length > 0) {
+      lastPlayerWhoBetrIndex = allActivePlayers.findIndex(p => p.id === lastPrediction[0].player_id);
+    }
+    
+    // Si no hay último jugador (nadie apostó), rotamos normalmente
+    // Si hay, empezamos la rotación desde el siguiente al último que apostó
+    let newOrder;
+    if (lastPlayerWhoBetrIndex >= 0) {
+      // Rotar empezando desde el siguiente al último que apostó
+      const startIndex = (lastPlayerWhoBetrIndex + 1) % allActivePlayers.length;
+      newOrder = [
+        ...allActivePlayers.slice(startIndex),
+        ...allActivePlayers.slice(0, startIndex)
+      ];
+    } else {
+      // Rotación normal (como antes)
+      newOrder = [...allActivePlayers.slice(1), allActivePlayers[0]];
+    }
+    
     for (let i = 0; i < newOrder.length; i++) {
       await client.query("UPDATE players SET order_position = $1 WHERE id = $2", [i + 1, newOrder[i].id]);
     }
