@@ -585,7 +585,16 @@ app.post("/predict", async (req, res) => {
     const playerIdsWhoBet = new Set(preds.map(p => p.player_id));
     const nextPlayer = players.find(p => !playerIdsWhoBet.has(p.id));
     if (!nextPlayer) return res.status(400).json({ error: "Todos ya han apostado" });
-    if (parseInt(player_id) !== nextPlayer.id) return res.status(400).json({ error: "No es tu turno" });
+    
+    // 🔥 Permitir apuesta si:
+    // 1. Es el turno del jugador (cualquiera puede apostar en su turno)
+    // 2. Es Admin (Admin puede apostar por cualquiera)
+    const isAdmin = req.session.user && req.session.user.role === 'admin';
+    const isPlayerTurn = parseInt(player_id) === nextPlayer.id;
+    
+    if (!isPlayerTurn && !isAdmin) {
+      return res.status(400).json({ error: "No es tu turno" });
+    }
     
     // Insertar predicción
     await pool.query("INSERT INTO predictions (week_id, player_id, result) VALUES ($1, $2, $3)", [week_id, player_id, result.trim()]);
