@@ -441,7 +441,6 @@ app.post("/api/change-role", async (req, res) => {
 
 // =====================================================
 // FIN DE ENDPOINTS DE FIREBASE
-// A partir de aquí, todo el código es IGUAL que antes
 // =====================================================
 
 // ===================== PLAYERS =====================
@@ -623,6 +622,82 @@ app.post("/predict", async (req, res) => {
     res.json({ success: true });
   } catch {
     res.status(400).json({ error: "Resultado ya elegido o jugador ya apostó" });
+  }
+});
+
+// =====================================================
+//  SALTAR JUGADOR (SOLO ADMIN)
+// =====================================================
+app.post("/skip-player", async (req, res) => {
+  // Verificar que es admin
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
+
+  const { week_id, player_id } = req.body;
+  if (!week_id || !player_id) {
+    return res.status(400).json({ error: "Datos incompletos" });
+  }
+
+  try {
+    const { rows: weekRows } = await pool.query("SELECT * FROM weeks WHERE id = $1", [week_id]);
+    if (!weekRows.length) return res.status(404).json({ error: "Semana no encontrada" });
+    const week = weekRows[0];
+
+    // Obtener lista de excluidos actuales
+    const excludedIds = week.excluded_players ? week.excluded_players.split(",").filter(Boolean).map(Number) : [];
+
+    // Agregar este jugador a la lista de excluidos
+    if (!excludedIds.includes(parseInt(player_id))) {
+      excludedIds.push(parseInt(player_id));
+    }
+
+    // Actualizar en la BD
+    await pool.query(
+      "UPDATE weeks SET excluded_players = $1 WHERE id = $2",
+      [excludedIds.join(","), week_id]
+    );
+
+    // Obtener el siguiente jugador para enviarle email
+    const { rows: players } = await pool.query(
+      "SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC",
+      [excludedIds.length ? excludedIds : [0]]
+    );
+    
+    const { rows: preds } = await pool.query(
+      "SELECT * FROM predictions WHERE week_id = $1 ORDER BY id ASC",
+      [week_id]
+    );
+    const playerIdsWhoBet = new Set(preds.map(p => p.player_id));
+    const nextPlayer = players.find(p => !playerIdsWhoBet.has(p.id));
+
+    // Enviar email al siguiente jugador (si existe)
+    if (nextPlayer) {
+      const homeTeamName = week.home_team_id 
+        ? (await pool.query("SELECT name FROM teams WHERE id = $1", [week.home_team_id])).rows[0]?.name || "Local"
+        : "Local";
+      const awayTeamName = week.away_team_id
+        ? (await pool.query("SELECT name FROM teams WHERE id = $1", [week.away_team_id])).rows[0]?.name || "Visitante"
+        : "Visitante";
+
+      const matchInfo = week.match || `${homeTeamName} vs ${awayTeamName}`;
+
+      sendTurnToPlayer(pool, nextPlayer.id, matchInfo, homeTeamName, awayTeamName)
+        .then(success => {
+          if (success) {
+            console.log(`📧 Email de turno enviado a ${nextPlayer.name}`);
+          }
+        })
+        .catch(err => {
+          console.error("❌ Error enviando email de turno:", err.message);
+        });
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error("❌ Error saltando jugador:", err);
+    res.status(500).json({ error: err.message });
   }
 });
 
