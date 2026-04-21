@@ -1223,6 +1223,44 @@ app.post("/api/close-poll", async (req, res) => {
 });
 
 // =====================================================
+// 🗳️ ESTABLECER GANADOR DE VOTACIÓN Y CREAR SEMANA
+// =====================================================
+app.post("/api/set-poll-winner", async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
+
+  const { home_team_id, away_team_id, round_number, match_name, match_date } = req.body;
+  
+  if (!home_team_id || !away_team_id || !round_number) {
+    return res.status(400).json({ error: "Datos incompletos" });
+  }
+
+  try {
+    // Obtener la votación activa (o la última)
+    const { rows: pollRows } = await pool.query(
+      "SELECT * FROM match_polls WHERE active = false ORDER BY id DESC LIMIT 1"
+    );
+    
+    if (!pollRows.length) {
+      return res.status(404).json({ error: "No hay votación cerrada" });
+    }
+
+    const poll = pollRows[0];
+
+    // Guardar el ganador en la votación
+    await pool.query(
+      "UPDATE match_polls SET winning_home_team = $1, winning_away_team = $2, winning_round = $3, winning_match = $4, winning_date = $5 WHERE id = $6",
+      [home_team_id, away_team_id, round_number, match_name || null, match_date || null, poll.id]
+    );
+
+    res.json({ success: true, message: "Ganador de votación establecido" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// =====================================================
 
 
 // ===================== TEAMS =====================
