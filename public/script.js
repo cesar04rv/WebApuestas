@@ -1717,49 +1717,30 @@ async function closePoll() {
 // 🗳️ ESTABLECER GANADOR DE VOTACIÓN
 // =====================================================
 function showSetPollWinnerForm() {
-  const homeTeamSelect = document.getElementById("winnerHomeTeam");
-  const awayTeamSelect = document.getElementById("winnerAwayTeam");
-  
-  if (!homeTeamSelect || !awayTeamSelect) {
-    console.warn("Selectores de equipos no encontrados");
-    return;
-  }
-  
-  // Limpiar y llenar selectores
-  homeTeamSelect.innerHTML = '<option value="">Selecciona equipo local...</option>';
-  awayTeamSelect.innerHTML = '<option value="">Selecciona equipo visitante...</option>';
-  
-  teams.forEach(team => {
-    const option1 = document.createElement("option");
-    option1.value = team.id;
-    option1.textContent = team.name;
-    homeTeamSelect.appendChild(option1);
-    
-    const option2 = document.createElement("option");
-    option2.value = team.id;
-    option2.textContent = team.name;
-    awayTeamSelect.appendChild(option2);
-  });
+  // Generar opciones de equipos
+  const teamOptions = teams.map(team => `<option value="${team.id}">${team.name}</option>`).join('');
   
   showModal({
     icon: "⚽",
     title: "Selecciona el partido ganador de la votación",
     body: `
-      <div style="display:flex; flex-direction:column; gap:12px;">
+      <div style="display:flex; flex-direction:column; gap:12px; margin:10px 0;">
         <div>
           <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Local</label>
           <select id="winnerHomeTeam" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0;">
             <option value="">Selecciona equipo local...</option>
+            ${teamOptions}
           </select>
         </div>
         <div>
           <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Visitante</label>
           <select id="winnerAwayTeam" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0;">
             <option value="">Selecciona equipo visitante...</option>
+            ${teamOptions}
           </select>
         </div>
         <div>
-          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28)</label>
+          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28) *</label>
           <input type="text" id="winnerRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
         </div>
         <div>
@@ -1782,7 +1763,8 @@ function showSetPollWinnerForm() {
       const matchDate = document.getElementById("winnerDate").value;
       
       if (!homeTeamId || !awayTeamId || !round) {
-        return toast("Completa los campos requeridos", "error");
+        toast("Completa los campos requeridos: equipos y jornada", "error");
+        return;
       }
       
       const data = await post("/api/set-poll-winner", {
