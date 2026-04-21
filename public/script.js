@@ -1704,8 +1704,8 @@ async function closePoll() {
         await loadPoll();
         if (currentUser.role === 'admin') renderAdminPoll();
         
-        // Mostrar formulario para elegir ganador
-        setTimeout(() => showSetPollWinnerForm(), 500);
+        // Mostrar ganador y pedir confirmación
+        setTimeout(() => showPollWinnerConfirmation(), 500);
       } catch(err) {
         toast("Error al cerrar votación", "error");
       }
@@ -1714,62 +1714,106 @@ async function closePoll() {
 }
 
 // =====================================================
-// 🗳️ ESTABLECER GANADOR Y CREAR SEMANA
+// 🗳️ MOSTRAR GANADOR Y PEDIR CONFIRMACIÓN
 // =====================================================
-function showSetPollWinnerForm() {
-  // Generar opciones de equipos
-  const teamOptions = teams.map(team => `<option value="${team.id}">${team.name}</option>`).join('');
+async function showPollWinnerConfirmation() {
+  // Obtener votación cerrada con resultados
+  const data = await api("/api/active-poll");
   
+  if (!data || data.active) {
+    toast("Error: no hay votación cerrada", "error");
+    return;
+  }
+
+  // Contar votos por opción
+  const options = data.options || [];
+  const votes = data.votes || [];
+  
+  const voteCount = {};
+  options.forEach(opt => {
+    voteCount[opt.id] = votes.filter(v => v.option_id === opt.id).length;
+  });
+
+  // Encontrar ganador (opción con más votos)
+  let winnerOption = options[0];
+  let maxVotes = voteCount[winnerOption.id] || 0;
+  
+  options.forEach(opt => {
+    const count = voteCount[opt.id] || 0;
+    if (count > maxVotes) {
+      maxVotes = count;
+      winnerOption = opt;
+    }
+  });
+
+  // Obtener nombres de equipos
+  const homeTeam = teams.find(t => t.id === winnerOption.home_team_id);
+  const awayTeam = teams.find(t => t.id === winnerOption.away_team_id);
+
+  const winnerText = homeTeam && awayTeam 
+    ? `<strong>${homeTeam.name}</strong> vs <strong>${awayTeam.name}</strong>`
+    : "Partido seleccionado";
+
   showModal({
     icon: "⚽",
-    title: "Crear semana desde ganador de votación",
+    title: "Ganador de la votación",
+    body: `
+      <div style="text-align:center; padding:20px;">
+        <p style="font-size:14px; color:#999; margin-bottom:10px;">El partido con más votos es:</p>
+        <p style="font-size:18px; margin:15px 0;">${winnerText}</p>
+        <p style="font-size:12px; color:#666;">Con <strong>${maxVotes}</strong> votos</p>
+      </div>
+    `,
+    confirmText: "Sí, crear semana con este",
+    danger: false,
+    onConfirm: () => {
+      // Mostrar formulario para rellenar jornada, fecha, etc.
+      showCreateWeekFromWinner(winnerOption);
+    }
+  });
+}
+
+// =====================================================
+// 🗳️ CREAR SEMANA CON DATOS PRE-CARGADOS
+// =====================================================
+function showCreateWeekFromWinner(winnerOption) {
+  const homeTeam = teams.find(t => t.id === winnerOption.home_team_id);
+  const awayTeam = teams.find(t => t.id === winnerOption.away_team_id);
+  const matchName = homeTeam && awayTeam ? `${homeTeam.name} - ${awayTeam.name}` : "";
+
+  showModal({
+    icon: "✏️",
+    title: "Crear semana",
     body: `
       <div style="display:flex; flex-direction:column; gap:12px; margin:10px 0;">
-        <div>
-          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Local *</label>
-          <select id="winnerHomeTeam" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0;">
-            <option value="">Selecciona equipo local...</option>
-            ${teamOptions}
-          </select>
-        </div>
-        <div>
-          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Equipo Visitante *</label>
-          <select id="winnerAwayTeam" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0;">
-            <option value="">Selecciona equipo visitante...</option>
-            ${teamOptions}
-          </select>
+        <div style="background:#1a1f28; padding:12px; border-radius:6px; border:1px solid #333;">
+          <p style="font-size:12px; color:#999; margin:0 0 6px 0;">Partido seleccionado:</p>
+          <p style="font-size:14px; margin:0;"><strong>${matchName}</strong></p>
         </div>
         <div>
           <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28) *</label>
-          <input type="text" id="winnerRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
-        </div>
-        <div>
-          <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Nombre del partido (opcional)</label>
-          <input type="text" id="winnerMatch" placeholder="Real Madrid - Barcelona" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
+          <input type="text" id="weekRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
         </div>
         <div>
           <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Fecha y hora (opcional)</label>
-          <input type="datetime-local" id="winnerDate" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
+          <input type="datetime-local" id="weekDate" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
         </div>
       </div>
     `,
     confirmText: "Crear Semana",
     danger: false,
     onConfirm: async () => {
-      const homeTeamId = document.getElementById("winnerHomeTeam").value;
-      const awayTeamId = document.getElementById("winnerAwayTeam").value;
-      const round = document.getElementById("winnerRound").value.trim();
-      const matchName = document.getElementById("winnerMatch").value.trim();
-      const matchDate = document.getElementById("winnerDate").value;
+      const round = document.getElementById("weekRound").value.trim();
+      const matchDate = document.getElementById("weekDate").value;
       
-      if (!homeTeamId || !awayTeamId || !round) {
-        toast("Completa los campos requeridos: equipos y jornada", "error");
+      if (!round) {
+        toast("Completa la jornada", "error");
         return;
       }
       
       const data = await post("/api/create-week-from-poll", {
-        home_team_id: parseInt(homeTeamId),
-        away_team_id: parseInt(awayTeamId),
+        home_team_id: winnerOption.home_team_id,
+        away_team_id: winnerOption.away_team_id,
         round_number: round,
         match_name: matchName || null,
         match_date: matchDate || null
