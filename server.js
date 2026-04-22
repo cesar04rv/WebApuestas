@@ -1232,23 +1232,36 @@ app.post("/api/create-week-from-poll", async (req, res) => {
 
   const { home_team_id, away_team_id, round_number, match_name, match_date } = req.body;
   
+  console.log("📝 Creando semana desde votación:", { home_team_id, away_team_id, round_number, match_name, match_date });
+
   if (!home_team_id || !away_team_id || !round_number) {
+    console.error("❌ Datos incompletos");
     return res.status(400).json({ error: "Datos incompletos" });
   }
 
   try {
     // Cerrar votación
-    await pool.query("UPDATE match_polls SET active = false WHERE active = true");
+    const closeResult = await pool.query("UPDATE match_polls SET active = false WHERE active = true");
+    console.log("✅ Votación cerrada");
+    
+    // Convertir match_date a formato correcto si existe
+    let formattedDate = null;
+    if (match_date) {
+      // match_date viene como "2026-04-25T14:30" y PostgreSQL espera "2026-04-25 14:30:00"
+      formattedDate = match_date.replace('T', ' ') + ':00';
+      console.log("📅 Fecha formateada:", formattedDate);
+    }
     
     // Crear nueva semana directamente con los datos
     const { rows: newWeek } = await pool.query(
       "INSERT INTO weeks (home_team_id, away_team_id, round_number, match, match_date, finished) VALUES ($1, $2, $3, $4, $5, 0) RETURNING *",
-      [home_team_id, away_team_id, round_number, match_name || null, match_date || null]
+      [home_team_id, away_team_id, round_number, match_name || null, formattedDate || null]
     );
 
+    console.log("✅ Semana creada:", newWeek[0]);
     res.json({ success: true, message: "Semana creada desde votación", week: newWeek[0] });
   } catch (err) {
-    console.error("Error:", err);
+    console.error("❌ Error al crear semana:", err);
     res.status(500).json({ error: err.message });
   }
 });
