@@ -1823,3 +1823,45 @@ function showCreateWeekForm(winnerOption, matchName) {
     }
   });
 }
+
+function renderAdminPoll() {
+  const container = document.getElementById("currentPollAdmin");
+  const btn = document.getElementById("closePollBtn");
+  
+  if (!currentPoll || !currentPoll.active) {
+    container.innerHTML = '<p class="empty-state" style="padding:12px 0;font-size:13px">No hay votación activa</p>';
+    btn.style.display = "none";
+    return;
+  }
+  
+  btn.style.display = "block";
+  
+  const totalVotes = currentPoll.votes.length;
+  const activePlayers = players.filter(p => p.active).length;
+  
+  let html = `
+    <div style="margin-bottom:10px">
+      <strong>${currentPoll.poll.title}</strong><br>
+      <span style="font-size:12px;color:var(--text-muted)">${totalVotes} de ${activePlayers} jugadores han votado</span>
+    </div>
+  `;
+  
+  pollOptions.forEach(opt => {
+    const percentage = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+    html += `
+      <div style="margin-bottom:8px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          ${teamBadge(opt.home_team_slug, 20)}
+          <span style="font-size:12px">${opt.home_team_name} vs ${opt.away_team_name}</span>
+          ${teamBadge(opt.away_team_slug, 20)}
+        </div>
+        <div style="background:rgba(255,255,255,0.05);height:6px;border-radius:3px;overflow:hidden">
+          <div style="background:var(--green);height:100%;width:${percentage}%"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${opt.votes} votos (${percentage}%)</div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
+}
