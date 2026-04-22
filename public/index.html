@@ -15,6 +15,7 @@
 <body>
 
 <div class="noise"></div>
+
 <header class="header">
   <div class="header-inner">
     <div class="logo">
@@ -66,7 +67,7 @@
     <button type="button" class="btn btn-share" onclick="captureAndShare()">📸 Compartir apuestas</button>
   </div>
 
-  <!--  VOTACIÓN DE PARTIDOS -->
+  <!-- 🗳️ VOTACIÓN DE PARTIDOS -->
   <section class="card" id="pollCard" style="display:none">
     <div class="card-header">
       <h2>🗳️ <span id="pollCardTitle">Votación</span></h2>
@@ -125,7 +126,7 @@
   </div>
   <div class="drawer-body">
 
-    <!--  PARTIDOS -->
+    <!-- ⚽ PARTIDOS -->
     <div class="drawer-group open">
       <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
         <span>⚽ Partidos</span>
@@ -178,7 +179,7 @@
       </div>
     </div>
 
-    <!--  JUGADORES -->
+    <!-- 👥 JUGADORES -->
     <div class="drawer-group">
       <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
         <span>👥 Jugadores</span>
@@ -204,7 +205,7 @@
       </div>
     </div>
 
-    <!--  EQUIPOS -->
+    <!-- 🛡️ EQUIPOS -->
     <div class="drawer-group">
       <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
         <span>🛡️ Equipos</span>
@@ -252,7 +253,7 @@
       </div>
     </div>
 
-    <!--  USUARIOS (SOLO ADMIN) -->
+    <!-- 👤 USUARIOS (SOLO ADMIN) -->
     <div class="drawer-group">
       <div class="drawer-group-header" onclick="this.parentElement.classList.toggle('open')">
         <span>👤 Usuarios</span>
@@ -277,7 +278,7 @@
       </div>
     </div>
 
-    <!--  ZONA PELIGRO -->
+    <!-- ⚠️ ZONA PELIGRO -->
     <div class="drawer-group">
       <div class="drawer-group-header danger" onclick="this.parentElement.classList.toggle('open')">
         <span>⚠️ Zona Peligro</span>
@@ -309,6 +310,34 @@
 
   </div>
 </aside>
+
+<!-- CREAR SEMANA DESDE VOTACIÓN (panel fijo, siempre en DOM) -->
+<div class="modal-overlay hidden" id="createWeekPollOverlay">
+  <div class="modal">
+    <div class="modal-icon">✏️</div>
+    <div class="modal-title">Crear semana</div>
+    <div class="modal-body">
+      <div style="display:flex;flex-direction:column;gap:12px;margin:10px 0">
+        <div style="background:#1a1f28;padding:12px;border-radius:6px;border:1px solid #333">
+          <p style="font-size:12px;color:#999;margin:0 0 6px 0">Partido seleccionado:</p>
+          <p style="font-size:14px;margin:0" id="cwpMatchName"></p>
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#999">Jornada (ej: J28) *</label>
+          <input type="text" id="cwpRound" placeholder="J28" style="width:100%;padding:8px;border-radius:4px;border:1px solid #333;background:#1a1f28;color:#e8eaf0;box-sizing:border-box">
+        </div>
+        <div>
+          <label style="display:block;margin-bottom:4px;font-size:12px;color:#999">Fecha y hora (opcional)</label>
+          <input type="datetime-local" id="cwpDate" style="width:100%;padding:8px;border-radius:4px;border:1px solid #333;background:#1a1f28;color:#e8eaf0;box-sizing:border-box">
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="btn btn-ghost" onclick="document.getElementById('createWeekPollOverlay').classList.add('hidden')">Cancelar</button>
+      <button type="button" class="btn btn-confirm" onclick="submitCreateWeekFromPoll()">Crear Semana</button>
+    </div>
+  </div>
+</div>
 
 <!-- TOAST -->
 <div class="toast" id="toast"></div>

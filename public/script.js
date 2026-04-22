@@ -1279,20 +1279,13 @@ function closeModal() {
 
 document.getElementById("modalConfirmBtn").addEventListener("click", async () => {
   if (modalCallback) {
-    const cb = modalCallback;
-    modalCallback = null; // clear before running so we can detect if a new modal opens
     try {
-      await cb();
+      await modalCallback();
     } catch (err) {
       console.error("Error in modalCallback:", err);
     }
-    // Only close if the callback didn't open a new modal (which sets modalCallback again)
-    if (!modalCallback) {
-      closeModal();
-    }
-  } else {
-    closeModal();
   }
+  closeModal();
 });
 
 document.getElementById("modalOverlay").addEventListener("click", (e) => {
@@ -1704,9 +1697,117 @@ async function createPoll() {
 }
 
 // =====================================================
-// 🗳️ MOSTRAR GANADOR Y PEDIR CONFIRMACIÓN (eliminada versión duplicada)
+// 🗳️ CERRAR VOTACIÓN Y MOSTRAR GANADOR
 // =====================================================
-// (duplicate closePoll and showPollWinnerConfirmation removed — use the versions below)
+
+// Variable global para guardar el partido ganador mientras se rellena el formulario
+let _pollWinner = null;
+
+async function closePoll() {
+  showModal({
+    icon: "🔒",
+    title: "¿Cerrar votación?",
+    body: "La votación actual se cerrará y los jugadores no podrán votar más.",
+    confirmText: "Cerrar Votación",
+    danger: true,
+    onConfirm: async () => {
+      try {
+        const pollDataSaved = JSON.parse(JSON.stringify(currentPoll));
+        await post("/api/close-poll", {});
+        toast("✓ Votación cerrada", "info");
+        await loadPoll();
+        if (currentUser.role === 'admin') renderAdminPoll();
+        setTimeout(() => showPollWinnerConfirmation(pollDataSaved), 300);
+      } catch(err) {
+        console.error("❌ Error:", err);
+        toast("Error al cerrar votación", "error");
+      }
+    }
+  });
+}
+
+function showPollWinnerConfirmation(pollData) {
+  if (!pollData || !pollData.options || pollData.options.length === 0) {
+    toast("Error: no hay datos de votación", "error");
+    return;
+  }
+
+  const options = pollData.options;
+  const votes = pollData.votes || [];
+
+  const voteCount = {};
+  options.forEach(opt => {
+    voteCount[opt.id] = votes.filter(v => v.option_id === opt.id).length;
+  });
+
+  let winnerOption = options[0];
+  let maxVotes = voteCount[winnerOption.id] || 0;
+  options.forEach(opt => {
+    const count = voteCount[opt.id] || 0;
+    if (count > maxVotes) { maxVotes = count; winnerOption = opt; }
+  });
+
+  const homeTeam = teams.find(t => t.id === winnerOption.home_team_id);
+  const awayTeam = teams.find(t => t.id === winnerOption.away_team_id);
+  const winnerText = homeTeam && awayTeam
+    ? `<strong>${homeTeam.name}</strong> vs <strong>${awayTeam.name}</strong>`
+    : "Partido seleccionado";
+  const matchName = homeTeam && awayTeam ? `${homeTeam.name} - ${awayTeam.name}` : "";
+
+  showModal({
+    icon: "⚽",
+    title: "Ganador de la votación",
+    body: `<div style="text-align:center;padding:20px"><p style="font-size:14px;color:#999;margin-bottom:10px">El partido con más votos es:</p><p style="font-size:18px;margin:15px 0">${winnerText}</p><p style="font-size:12px;color:#666">Con <strong>${maxVotes}</strong> votos</p></div>`,
+    confirmText: "Sí, crear semana",
+    danger: false,
+    onConfirm: () => {
+      // Guardamos el ganador en variable global y abrimos el panel fijo del HTML
+      _pollWinner = { winnerOption, matchName };
+      document.getElementById("cwpMatchName").textContent = matchName;
+      document.getElementById("cwpRound").value = "";
+      document.getElementById("cwpDate").value = "";
+      document.getElementById("createWeekPollOverlay").classList.remove("hidden");
+    }
+  });
+}
+
+async function submitCreateWeekFromPoll() {
+  const round = (document.getElementById("cwpRound").value || "").trim();
+  const matchDate = document.getElementById("cwpDate").value || "";
+
+  if (!round) {
+    toast("Indica la jornada", "error");
+    return;
+  }
+  if (!_pollWinner) {
+    toast("Error: no hay partido seleccionado", "error");
+    return;
+  }
+
+  const { winnerOption, matchName } = _pollWinner;
+
+  try {
+    const data = await post("/api/create-week-from-poll", {
+      home_team_id: winnerOption.home_team_id,
+      away_team_id: winnerOption.away_team_id,
+      round_number: round,
+      match_name: matchName || null,
+      match_date: matchDate || null
+    });
+
+    if (data.error) {
+      toast(data.error, "error");
+    } else {
+      document.getElementById("createWeekPollOverlay").classList.add("hidden");
+      _pollWinner = null;
+      toast("✓ Semana creada desde votación", "success");
+      loadData();
+    }
+  } catch (err) {
+    console.error("❌ Error:", err);
+    toast("Error: " + err.message, "error");
+  }
+}
 
 function renderAdminPoll() {
   const container = document.getElementById("currentPollAdmin");
@@ -1748,156 +1849,4 @@ function renderAdminPoll() {
   });
   
   container.innerHTML = html;
-}
-// =====================================================
-// 🗳️ CERRAR VOTACIÓN Y MOSTRAR GANADOR
-// =====================================================
-async function closePoll() {
-  showModal({
-    icon: "🔒",
-    title: "¿Cerrar votación?",
-    body: "La votación actual se cerrará y los jugadores no podrán votar más.",
-    confirmText: "Cerrar Votación",
-    danger: true,
-    onConfirm: async () => {
-      try {
-        console.log("🔒 Cerrando votación...");
-        const pollDataSaved = JSON.parse(JSON.stringify(currentPoll));
-        console.log("💾 Datos guardados:", pollDataSaved);
-        
-        await post("/api/close-poll", {});
-        console.log("✅ Votación cerrada en BD");
-        toast("✓ Votación cerrada", "info");
-        
-        await loadPoll();
-        if (currentUser.role === 'admin') renderAdminPoll();
-        
-        // El modal se cerrará automáticamente, así que esperamos un poco antes de mostrar el siguiente
-        setTimeout(() => {
-          console.log("⏳ Mostrando ganador...");
-          showPollWinnerConfirmation(pollDataSaved);
-        }, 300);
-        
-      } catch(err) {
-        console.error("❌ Error:", err);
-        toast("Error al cerrar votación", "error");
-      }
-    }
-  });
-}
-
-function showPollWinnerConfirmation(pollData) {
-  console.log("📊 showPollWinnerConfirmation called");
-  if (!pollData || !pollData.options) {
-    console.error("❌ No hay datos válidos");
-    toast("Error: no hay datos de votación", "error");
-    return;
-  }
-
-  const options = pollData.options || [];
-  const votes = pollData.votes || [];
-  
-  const voteCount = {};
-  options.forEach(opt => {
-    voteCount[opt.id] = votes.filter(v => v.option_id === opt.id).length;
-  });
-
-  let winnerOption = options[0];
-  let maxVotes = voteCount[winnerOption.id] || 0;
-  
-  options.forEach(opt => {
-    const count = voteCount[opt.id] || 0;
-    if (count > maxVotes) {
-      maxVotes = count;
-      winnerOption = opt;
-    }
-  });
-
-  if (!winnerOption) {
-    toast("No hay opciones", "error");
-    return;
-  }
-
-  const homeTeam = teams.find(t => t.id === winnerOption.home_team_id);
-  const awayTeam = teams.find(t => t.id === winnerOption.away_team_id);
-  const winnerText = homeTeam && awayTeam 
-    ? `<strong>${homeTeam.name}</strong> vs <strong>${awayTeam.name}</strong>`
-    : "Partido";
-  const matchName = homeTeam && awayTeam ? `${homeTeam.name} - ${awayTeam.name}` : "";
-
-  console.log("🎯 Mostrando modal de ganador");
-
-  showModal({
-    icon: "⚽",
-    title: "Ganador de la votación",
-    body: `<div style="text-align:center; padding:20px;"><p style="font-size:14px; color:#999; margin-bottom:10px;">El partido con más votos es:</p><p style="font-size:18px; margin:15px 0;">${winnerText}</p><p style="font-size:12px; color:#666;">Con <strong>${maxVotes}</strong> votos</p></div>`,
-    confirmText: "Sí, crear semana",
-    danger: false,
-    onConfirm: () => {
-      console.log("✅ Usuario confirmó ganador");
-      setTimeout(() => showCreateWeekForm(winnerOption, matchName), 300);
-    }
-  });
-}
-
-function showCreateWeekForm(winnerOption, matchName) {
-  console.log("📝 showCreateWeekForm called", {winnerOption, matchName});
-  
-  // Variables para guardar los valores antes de que se cierre el modal
-  let savedRound = null;
-  let savedMatchDate = null;
-  
-  showModal({
-    icon: "✏️",
-    title: "Crear semana",
-    body: `<div style="display:flex; flex-direction:column; gap:12px; margin:10px 0;"><div style="background:#1a1f28; padding:12px; border-radius:6px; border:1px solid #333;"><p style="font-size:12px; color:#999; margin:0 0 6px 0;">Partido seleccionado:</p><p style="font-size:14px; margin:0;"><strong>${matchName}</strong></p></div><div><label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28) *</label><input type="text" id="weekRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;"></div><div><label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Fecha y hora (opcional)</label><input type="datetime-local" id="weekDate" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;"></div></div>`,
-    confirmText: "Crear Semana",
-    danger: false,
-    onConfirm: async () => {
-      console.log("📤 onConfirm ejecutado");
-      
-      // GUARDAR VALORES INMEDIATAMENTE
-      const roundInput = document.getElementById("weekRound");
-      const dateInput = document.getElementById("weekDate");
-      
-      if (roundInput) {
-        savedRound = roundInput.value.trim();
-        console.log("✅ Round guardado:", savedRound);
-      }
-      if (dateInput) {
-        savedMatchDate = dateInput.value;
-        console.log("✅ Date guardado:", savedMatchDate);
-      }
-      
-      if (!savedRound) {
-        toast("Completa jornada", "error");
-        return;
-      }
-      
-      console.log("📤 Creando semana con:", {savedRound, savedMatchDate, winnerOption});
-      
-      try {
-        console.log("📨 Enviando POST a /api/create-week-from-poll");
-        const data = await post("/api/create-week-from-poll", {
-          home_team_id: winnerOption.home_team_id,
-          away_team_id: winnerOption.away_team_id,
-          round_number: savedRound,
-          match_name: matchName || null,
-          match_date: savedMatchDate || null
-        });
-        
-        console.log("📥 Respuesta:", data);
-        
-        if (data.error) {
-          toast(data.error, "error");
-        } else {
-          toast("✓ Semana creada", "success");
-          loadData();
-        }
-      } catch (err) {
-        console.error("❌ Error:", err);
-        toast("Error: " + err.message, "error");
-      }
-    }
-  });
 }
