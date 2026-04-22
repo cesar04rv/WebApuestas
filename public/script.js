@@ -1991,6 +1991,10 @@ function showPollWinnerConfirmation(pollData) {
 function showCreateWeekForm(winnerOption, matchName) {
   console.log("📝 showCreateWeekForm called", {winnerOption, matchName});
   
+  // Variables para guardar los valores antes de que se cierre el modal
+  let savedRound = null;
+  let savedMatchDate = null;
+  
   showModal({
     icon: "✏️",
     title: "Crear semana",
@@ -1998,39 +2002,36 @@ function showCreateWeekForm(winnerOption, matchName) {
     confirmText: "Crear Semana",
     danger: false,
     onConfirm: async () => {
-      console.log("📤 onConfirm ejecutado - ACCEDIENDO A INPUTS ANTES DE CERRAR");
+      console.log("📤 onConfirm ejecutado");
       
-      // ACCEDER A LOS INPUTS MIENTRAS EL MODAL AÚN ESTÁ VISIBLE
+      // GUARDAR VALORES INMEDIATAMENTE
       const roundInput = document.getElementById("weekRound");
       const dateInput = document.getElementById("weekDate");
       
-      console.log("roundInput:", roundInput);
-      console.log("dateInput:", dateInput);
-      
-      if (!roundInput || !dateInput) {
-        console.error("❌ Inputs no encontrados");
-        toast("Error: campos no cargados", "error");
-        return;
+      if (roundInput) {
+        savedRound = roundInput.value.trim();
+        console.log("✅ Round guardado:", savedRound);
+      }
+      if (dateInput) {
+        savedMatchDate = dateInput.value;
+        console.log("✅ Date guardado:", savedMatchDate);
       }
       
-      const round = roundInput.value.trim();
-      const matchDate = dateInput.value;
-      
-      console.log("📤 Datos obtenidos:", {round, matchDate});
-      
-      if (!round) {
+      if (!savedRound) {
         toast("Completa jornada", "error");
         return;
       }
+      
+      console.log("📤 Creando semana con:", {savedRound, savedMatchDate, winnerOption});
       
       try {
         console.log("📨 Enviando POST a /api/create-week-from-poll");
         const data = await post("/api/create-week-from-poll", {
           home_team_id: winnerOption.home_team_id,
           away_team_id: winnerOption.away_team_id,
-          round_number: round,
+          round_number: savedRound,
           match_name: matchName || null,
-          match_date: matchDate || null
+          match_date: savedMatchDate || null
         });
         
         console.log("📥 Respuesta:", data);
