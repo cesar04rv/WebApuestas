@@ -1791,62 +1791,71 @@ function showPollWinnerConfirmation(pollData, pollVotes) {
     `,
     confirmText: "Sí, crear semana",
     danger: false,
-    onConfirm: () => {
-      console.log("✅ Confirmado ganador, preparando segundo modal");
-      // Mostrar siguiente modal después de que se cierre este
-      setTimeout(() => {
-        showModal({
-          icon: "✏️",
-          title: "Crear semana",
-          body: `
-            <div style="display:flex; flex-direction:column; gap:12px; margin:10px 0;">
-              <div style="background:#1a1f28; padding:12px; border-radius:6px; border:1px solid #333;">
-                <p style="font-size:12px; color:#999; margin:0 0 6px 0;">Partido seleccionado:</p>
-                <p style="font-size:14px; margin:0;"><strong>${matchName}</strong></p>
-              </div>
-              <div>
-                <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28) *</label>
-                <input type="text" id="weekRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
-              </div>
-              <div>
-                <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Fecha y hora (opcional)</label>
-                <input type="datetime-local" id="weekDate" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
-              </div>
+    onConfirm: async () => {
+      console.log("Confirmed winner, showing week creation form");
+      
+      // Mostrar segundo modal directamente
+      showModal({
+        icon: "✏️",
+        title: "Crear semana",
+        body: `
+          <div style="display:flex; flex-direction:column; gap:12px; margin:10px 0;">
+            <div style="background:#1a1f28; padding:12px; border-radius:6px; border:1px solid #333;">
+              <p style="font-size:12px; color:#999; margin:0 0 6px 0;">Partido seleccionado:</p>
+              <p style="font-size:14px; margin:0;"><strong>${matchName}</strong></p>
             </div>
-          `,
-          confirmText: "Crear Semana",
-          danger: false,
-          onConfirm: async () => {
-            const round = document.getElementById("weekRound").value.trim();
-            const matchDate = document.getElementById("weekDate").value;
-            
-            if (!round) {
-              toast("Completa la jornada", "error");
-              return;
-            }
-            
-            try {
-              const data = await post("/api/create-week-from-poll", {
-                home_team_id: winnerOption.home_team_id,
-                away_team_id: winnerOption.away_team_id,
-                round_number: round,
-                match_name: matchName || null,
-                match_date: matchDate || null
-              });
-              
-              if (data.error) {
-                toast(data.error, "error");
-              } else {
-                toast("✓ Semana creada desde votación", "success");
-                loadData();
-              }
-            } catch (err) {
-              console.error("Error:", err);
-              toast("Error al crear semana", "error");
-            }
+            <div>
+              <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28) *</label>
+              <input type="text" id="weekRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
+            </div>
+            <div>
+              <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Fecha y hora (opcional)</label>
+              <input type="datetime-local" id="weekDate" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
+            </div>
+          </div>
+        `,
+        confirmText: "Crear Semana",
+        danger: false,
+        onConfirm: async () => {
+          const round = document.getElementById("weekRound").value.trim();
+          const matchDate = document.getElementById("weekDate").value;
+          
+          console.log("📤 Enviando datos:", {
+            home_team_id: winnerOption.home_team_id,
+            away_team_id: winnerOption.away_team_id,
+            round_number: round,
+            match_name: matchName,
+            match_date: matchDate
+          });
+          
+          if (!round) {
+            toast("Completa la jornada", "error");
+            return;
           }
-        });
-      }, 100);
+          
+          try {
+            const data = await post("/api/create-week-from-poll", {
+              home_team_id: winnerOption.home_team_id,
+              away_team_id: winnerOption.away_team_id,
+              round_number: round,
+              match_name: matchName || null,
+              match_date: matchDate || null
+            });
+            
+            console.log("📥 Respuesta del servidor:", data);
+            
+            if (data.error) {
+              toast(data.error, "error");
+            } else {
+              toast("✓ Semana creada desde votación", "success");
+              loadData();
+            }
+          } catch (err) {
+            console.error("❌ Error:", err);
+            toast("Error al crear semana: " + err.message, "error");
+          }
+        }
+      });
     }
   });
 }
