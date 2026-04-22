@@ -1279,13 +1279,20 @@ function closeModal() {
 
 document.getElementById("modalConfirmBtn").addEventListener("click", async () => {
   if (modalCallback) {
+    const cb = modalCallback;
+    modalCallback = null; // clear before running so we can detect if a new modal opens
     try {
-      await modalCallback();
+      await cb();
     } catch (err) {
       console.error("Error in modalCallback:", err);
     }
+    // Only close if the callback didn't open a new modal (which sets modalCallback again)
+    if (!modalCallback) {
+      closeModal();
+    }
+  } else {
+    closeModal();
   }
-  closeModal();
 });
 
 document.getElementById("modalOverlay").addEventListener("click", (e) => {
