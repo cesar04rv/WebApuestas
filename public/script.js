@@ -1699,53 +1699,47 @@ async function closePoll() {
     danger: true,
     onConfirm: async () => {
       try {
-        await post("/api/close-poll", {});
-        toast("✓ Votación cerrada", "info");
+        console.log("🔒 Cerrando votación...");
+        const pollDataSaved = JSON.parse(JSON.stringify(currentPoll));
+        console.log("💾 Datos guardados:", pollDataSaved);
         
-        // Guardar datos de votación antes de recargar
-        const pollData = currentPoll;
-        const pollVotes = predictions ? [...predictions] : [];
+        await post("/api/close-poll", {});
+        console.log("✅ Votación cerrada en BD");
+        toast("✓ Votación cerrada", "info");
         
         await loadPoll();
         if (currentUser.role === 'admin') renderAdminPoll();
         
-        // Mostrar ganador con datos guardados
-        setTimeout(() => showPollWinnerConfirmation(pollData, pollVotes), 500);
+        closeModal();
+        setTimeout(() => {
+          console.log("⏳ Mostrando ganador...");
+          showPollWinnerConfirmation(pollDataSaved);
+        }, 200);
+        
       } catch(err) {
-        console.error("Error:", err);
+        console.error("❌ Error:", err);
         toast("Error al cerrar votación", "error");
       }
     }
   });
 }
 
-// =====================================================
-// 🗳️ MOSTRAR GANADOR Y PEDIR CONFIRMACIÓN
-// =====================================================
-function showPollWinnerConfirmation(pollData, pollVotes) {
+function showPollWinnerConfirmation(pollData) {
+  console.log("📊 showPollWinnerConfirmation called");
   if (!pollData || !pollData.options) {
-    console.error("No hay datos de votación", pollData);
+    console.error("❌ No hay datos válidos");
     toast("Error: no hay datos de votación", "error");
     return;
   }
 
-  console.log("pollData:", pollData);
-
-  // Contar votos por opción
   const options = pollData.options || [];
   const votes = pollData.votes || [];
-  
-  console.log("Options:", options);
-  console.log("Votes:", votes);
   
   const voteCount = {};
   options.forEach(opt => {
     voteCount[opt.id] = votes.filter(v => v.option_id === opt.id).length;
   });
 
-  console.log("Vote counts:", voteCount);
-
-  // Encontrar ganador (opción con más votos)
   let winnerOption = options[0];
   let maxVotes = voteCount[winnerOption.id] || 0;
   
@@ -1758,146 +1752,74 @@ function showPollWinnerConfirmation(pollData, pollVotes) {
   });
 
   if (!winnerOption) {
-    toast("No hay opciones de votación", "error");
+    toast("No hay opciones", "error");
     return;
   }
 
-  console.log("Winner option:", winnerOption);
-
-  // Obtener nombres de equipos
   const homeTeam = teams.find(t => t.id === winnerOption.home_team_id);
   const awayTeam = teams.find(t => t.id === winnerOption.away_team_id);
-
-  console.log("Home team:", homeTeam);
-  console.log("Away team:", awayTeam);
-
   const winnerText = homeTeam && awayTeam 
     ? `<strong>${homeTeam.name}</strong> vs <strong>${awayTeam.name}</strong>`
-    : "Partido seleccionado";
-
+    : "Partido";
   const matchName = homeTeam && awayTeam ? `${homeTeam.name} - ${awayTeam.name}` : "";
 
-  console.log("About to show modal with winner text:", winnerText);
+  console.log("🎯 Mostrando modal de ganador");
 
   showModal({
     icon: "⚽",
     title: "Ganador de la votación",
-    body: `
-      <div style="text-align:center; padding:20px;">
-        <p style="font-size:14px; color:#999; margin-bottom:10px;">El partido con más votos es:</p>
-        <p style="font-size:18px; margin:15px 0;">${winnerText}</p>
-        <p style="font-size:12px; color:#666;">Con <strong>${maxVotes}</strong> votos</p>
-      </div>
-    `,
+    body: `<div style="text-align:center; padding:20px;"><p style="font-size:14px; color:#999; margin-bottom:10px;">El partido con más votos es:</p><p style="font-size:18px; margin:15px 0;">${winnerText}</p><p style="font-size:12px; color:#666;">Con <strong>${maxVotes}</strong> votos</p></div>`,
     confirmText: "Sí, crear semana",
     danger: false,
-    onConfirm: async () => {
-      console.log("Confirmed winner, showing week creation form");
-      
-      // Mostrar segundo modal directamente
-      showModal({
-        icon: "✏️",
-        title: "Crear semana",
-        body: `
-          <div style="display:flex; flex-direction:column; gap:12px; margin:10px 0;">
-            <div style="background:#1a1f28; padding:12px; border-radius:6px; border:1px solid #333;">
-              <p style="font-size:12px; color:#999; margin:0 0 6px 0;">Partido seleccionado:</p>
-              <p style="font-size:14px; margin:0;"><strong>${matchName}</strong></p>
-            </div>
-            <div>
-              <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28) *</label>
-              <input type="text" id="weekRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
-            </div>
-            <div>
-              <label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Fecha y hora (opcional)</label>
-              <input type="datetime-local" id="weekDate" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;">
-            </div>
-          </div>
-        `,
-        confirmText: "Crear Semana",
-        danger: false,
-        onConfirm: async () => {
-          const round = document.getElementById("weekRound").value.trim();
-          const matchDate = document.getElementById("weekDate").value;
-          
-          console.log("📤 Enviando datos:", {
-            home_team_id: winnerOption.home_team_id,
-            away_team_id: winnerOption.away_team_id,
-            round_number: round,
-            match_name: matchName,
-            match_date: matchDate
-          });
-          
-          if (!round) {
-            toast("Completa la jornada", "error");
-            return;
-          }
-          
-          try {
-            const data = await post("/api/create-week-from-poll", {
-              home_team_id: winnerOption.home_team_id,
-              away_team_id: winnerOption.away_team_id,
-              round_number: round,
-              match_name: matchName || null,
-              match_date: matchDate || null
-            });
-            
-            console.log("📥 Respuesta del servidor:", data);
-            
-            if (data.error) {
-              toast(data.error, "error");
-            } else {
-              toast("✓ Semana creada desde votación", "success");
-              loadData();
-            }
-          } catch (err) {
-            console.error("❌ Error:", err);
-            toast("Error al crear semana: " + err.message, "error");
-          }
-        }
-      });
+    onConfirm: () => {
+      console.log("✅ Usuario confirmó ganador");
+      closeModal();
+      setTimeout(() => showCreateWeekForm(winnerOption, matchName), 200);
     }
   });
 }
 
-function renderAdminPoll() {
-  const container = document.getElementById("currentPollAdmin");
-  const btn = document.getElementById("closePollBtn");
+function showCreateWeekForm(winnerOption, matchName) {
+  console.log("📝 showCreateWeekForm called", {winnerOption, matchName});
   
-  if (!currentPoll || !currentPoll.active) {
-    container.innerHTML = '<p class="empty-state" style="padding:12px 0;font-size:13px">No hay votación activa</p>';
-    btn.style.display = "none";
-    return;
-  }
-  
-  btn.style.display = "block";
-  
-  const totalVotes = currentPoll.votes.length;
-  const activePlayers = players.filter(p => p.active).length;
-  
-  let html = `
-    <div style="margin-bottom:10px">
-      <strong>${currentPoll.poll.title}</strong><br>
-      <span style="font-size:12px;color:var(--text-muted)">${totalVotes} de ${activePlayers} jugadores han votado</span>
-    </div>
-  `;
-  
-  pollOptions.forEach(opt => {
-    const percentage = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
-    html += `
-      <div style="margin-bottom:8px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
-          ${teamBadge(opt.home_team_slug, 20)}
-          <span style="font-size:12px">${opt.home_team_name} vs ${opt.away_team_name}</span>
-          ${teamBadge(opt.away_team_slug, 20)}
-        </div>
-        <div style="background:rgba(255,255,255,0.05);height:6px;border-radius:3px;overflow:hidden">
-          <div style="background:var(--green);height:100%;width:${percentage}%"></div>
-        </div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${opt.votes} votos (${percentage}%)</div>
-      </div>
-    `;
+  showModal({
+    icon: "✏️",
+    title: "Crear semana",
+    body: `<div style="display:flex; flex-direction:column; gap:12px; margin:10px 0;"><div style="background:#1a1f28; padding:12px; border-radius:6px; border:1px solid #333;"><p style="font-size:12px; color:#999; margin:0 0 6px 0;">Partido seleccionado:</p><p style="font-size:14px; margin:0;"><strong>${matchName}</strong></p></div><div><label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Jornada (ej: J28) *</label><input type="text" id="weekRound" placeholder="J28" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;"></div><div><label style="display:block; margin-bottom:4px; font-size:12px; color:#999;">Fecha y hora (opcional)</label><input type="datetime-local" id="weekDate" style="width:100%; padding:8px; border-radius:4px; border:1px solid #333; background:#1a1f28; color:#e8eaf0; box-sizing:border-box;"></div></div>`,
+    confirmText: "Crear Semana",
+    danger: false,
+    onConfirm: async () => {
+      const round = document.getElementById("weekRound").value.trim();
+      const matchDate = document.getElementById("weekDate").value;
+      
+      console.log("📤 Creando:", {round, matchDate, winnerOption});
+      
+      if (!round) {
+        toast("Completa jornada", "error");
+        return;
+      }
+      
+      try {
+        const data = await post("/api/create-week-from-poll", {
+          home_team_id: winnerOption.home_team_id,
+          away_team_id: winnerOption.away_team_id,
+          round_number: round,
+          match_name: matchName || null,
+          match_date: matchDate || null
+        });
+        
+        console.log("📥 Respuesta:", data);
+        
+        if (data.error) {
+          toast(data.error, "error");
+        } else {
+          toast("✓ Semana creada", "success");
+          loadData();
+        }
+      } catch (err) {
+        console.error("❌ Error:", err);
+        toast("Error: " + err.message, "error");
+      }
+    }
   });
-  
-  container.innerHTML = html;
 }
