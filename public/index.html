@@ -311,7 +311,25 @@
   </div>
 </aside>
 
-<!-- CREAR SEMANA DESDE VOTACIÓN (panel fijo, siempre en DOM) -->
+<!-- ═══ RULETA DE DESEMPATE ═══ -->
+<div class="modal-overlay hidden" id="rouletteOverlay">
+  <div class="roulette-modal">
+    <div class="roulette-header">
+      <span class="roulette-icon">🎰</span>
+      <h2 class="roulette-title">¡DESEMPATE!</h2>
+      <p class="roulette-tied" id="rouletteTied"></p>
+    </div>
+    <div class="roulette-wheel-wrap">
+      <canvas id="rouletteCanvas" width="300" height="300"></canvas>
+    </div>
+    <div class="roulette-result" id="rouletteResult"></div>
+    <button type="button" class="btn-roulette-spin" id="rouletteSpinBtn">🎰 ¡GIRAR!</button>
+    <button type="button" class="btn-ghost" style="margin-top:8px;font-size:12px;opacity:0.5" onclick="document.getElementById('rouletteOverlay').classList.add('hidden')">Cancelar</button>
+  </div>
+  <div id="confettiContainer" class="confetti-container"></div>
+</div>
+
+<!-- ═══ CREAR SEMANA DESDE VOTACIÓN (panel fijo) ═══ -->
 <div class="modal-overlay hidden" id="createWeekPollOverlay">
   <div class="modal">
     <div class="modal-icon">✏️</div>
@@ -320,7 +338,7 @@
       <div style="display:flex;flex-direction:column;gap:12px;margin:10px 0">
         <div style="background:#1a1f28;padding:12px;border-radius:6px;border:1px solid #333">
           <p style="font-size:12px;color:#999;margin:0 0 6px 0">Partido seleccionado:</p>
-          <p style="font-size:14px;margin:0" id="cwpMatchName"></p>
+          <p style="font-size:14px;margin:0;font-weight:600" id="cwpMatchName"></p>
         </div>
         <div>
           <label style="display:block;margin-bottom:4px;font-size:12px;color:#999">Jornada (ej: J28) *</label>
