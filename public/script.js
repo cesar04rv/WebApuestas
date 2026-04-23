@@ -1764,36 +1764,100 @@ function showRoulette(tiedOptions, voteCount) {
   const items = tiedOptions.map(opt => {
     const home = teams.find(t => t.id === opt.home_team_id);
     const away = teams.find(t => t.id === opt.away_team_id);
-    return { opt, label: home && away ? `${home.name} - ${away.name}` : "Partido", votes: voteCount[opt.id] || 0 };
+    return {
+      opt,
+      label: home && away ? `${home.name} - ${away.name}` : "Partido",
+      votes: voteCount[opt.id] || 0,
+      homeSlug: home ? home.slug : null,
+      awaySlug: away ? away.slug : null
+    };
   });
   const n = items.length;
-  const COLORS = ["#e63946","#f4a261","#2a9d8f","#457b9d","#e9c46a","#6d4c9f","#f77f00","#23967f"];
+  const COLORS = ["#1a2535","#251a1a","#1a2520","#251a25","#25251a","#1a1a25","#251a20","#1a2525"];
   const sliceAngle = (2 * Math.PI) / n;
   let currentAngle = -Math.PI / 2;
   let spinning = false;
   const ctx = canvas.getContext("2d");
   const R = canvas.width / 2;
+  const imgCache = {};
+
+  function loadImg(slug) {
+    if (!slug) return Promise.resolve(null);
+    if (imgCache[slug]) return Promise.resolve(imgCache[slug]);
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload  = () => { imgCache[slug] = img; resolve(img); };
+      img.onerror = () => { imgCache[slug] = null; resolve(null); };
+      img.src = `/Escudos/${slug}.svg`;
+    });
+  }
+
+  function drawShield(img, cx, cy, sz) {
+    if (img) {
+      ctx.drawImage(img, cx - sz / 2, cy - sz / 2, sz, sz);
+    } else {
+      ctx.beginPath(); ctx.arc(cx, cy, sz / 2, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff22"; ctx.fill();
+    }
+  }
 
   function drawWheel(angle) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     items.forEach((item, i) => {
       const start = angle + i * sliceAngle, end = start + sliceAngle;
+      const mid   = start + sliceAngle / 2;
+
+      // Sector
       ctx.beginPath(); ctx.moveTo(R, R); ctx.arc(R, R, R - 4, start, end); ctx.closePath();
       ctx.fillStyle = COLORS[i % COLORS.length]; ctx.fill();
-      ctx.strokeStyle = "#0d1117"; ctx.lineWidth = 3; ctx.stroke();
-      ctx.save(); ctx.translate(R, R); ctx.rotate(start + sliceAngle / 2);
-      ctx.textAlign = "right"; ctx.fillStyle = "#fff";
-      ctx.font = `bold ${Math.min(13, 160 / n)}px Barlow Condensed, sans-serif`;
-      ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 4;
-      const parts = item.label.split(" - ");
-      if (parts.length === 2) { ctx.fillText(parts[0], R - 18, -6); ctx.fillText(parts[1], R - 18, 10); }
-      else { ctx.fillText(item.label, R - 18, 4); }
-      ctx.restore();
+      ctx.strokeStyle = "#ffffff18"; ctx.lineWidth = 2; ctx.stroke();
+
+      // Escudos
+      const homeImg = imgCache[item.homeSlug] || null;
+      const awayImg = imgCache[item.awaySlug] || null;
+      const imgR = R * 0.60;
+      const cx = R + Math.cos(mid) * imgR;
+      const cy = R + Math.sin(mid) * imgR;
+      const maxSz = Math.min(36, (2 * Math.PI * imgR / n) * 0.75);
+
+      if (n <= 4) {
+        // Sectores grandes: dos escudos lado a lado perpendicular al radio
+        const sz = maxSz * 0.85;
+        const gap = sz * 0.6;
+        const nx = -Math.sin(mid), ny = Math.cos(mid); // perpendicular
+        drawShield(homeImg, cx - nx * gap, cy - ny * gap, sz);
+        drawShield(awayImg, cx + nx * gap, cy + ny * gap, sz);
+      } else {
+        // Sectores pequeños: escudos apilados en el radio
+        const sz = maxSz * 0.7;
+        const pr = R * 0.18; // separación en dirección radial
+        const px = Math.cos(mid), py = Math.sin(mid);
+        drawShield(homeImg, cx - px * pr, cy - py * pr, sz);
+        drawShield(awayImg, cx + px * pr, cy + py * pr, sz);
+      }
+
+      // Separador
+      ctx.beginPath(); ctx.moveTo(R, R);
+      ctx.lineTo(R + Math.cos(start) * (R - 4), R + Math.sin(start) * (R - 4));
+      ctx.strokeStyle = "#ffffff30"; ctx.lineWidth = 1.5; ctx.stroke();
     });
+
+    // Aro exterior
+    ctx.beginPath(); ctx.arc(R, R, R - 3, 0, 2 * Math.PI);
+    ctx.strokeStyle = "#ffffff25"; ctx.lineWidth = 5; ctx.stroke();
+
+    // Centro
     ctx.beginPath(); ctx.arc(R, R, 22, 0, 2 * Math.PI);
-    ctx.fillStyle = "#0d1117"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(R - 14, 4); ctx.lineTo(R + 14, 4); ctx.lineTo(R, 36); ctx.closePath();
-    ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0;
+    const grad = ctx.createRadialGradient(R - 5, R - 5, 0, R, R, 22);
+    grad.addColorStop(0, "#3a4050"); grad.addColorStop(1, "#0d1117");
+    ctx.fillStyle = grad; ctx.fill();
+    ctx.strokeStyle = "#ffffff35"; ctx.lineWidth = 2; ctx.stroke();
+
+    // Puntero
+    ctx.beginPath(); ctx.moveTo(R - 12, 6); ctx.lineTo(R + 12, 6); ctx.lineTo(R, 34); ctx.closePath();
+    ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,0.9)"; ctx.shadowBlur = 8;
+    ctx.fill(); ctx.shadowBlur = 0;
   }
 
   function spin() {
@@ -1825,12 +1889,19 @@ function showRoulette(tiedOptions, voteCount) {
     requestAnimationFrame(frame);
   }
 
+  // Reset UI y precargar imágenes
   resultEl.style.opacity = "0"; resultEl.innerHTML = "";
-  spinBtn.textContent = "🎰 ¡GIRAR!"; spinBtn.disabled = false; spinBtn.onclick = spin;
-  drawWheel(currentAngle);
+  spinBtn.textContent = "Cargando..."; spinBtn.disabled = true; spinBtn.onclick = spin;
   document.getElementById("rouletteTied").textContent =
     `Empate a ${items[0].votes} voto${items[0].votes !== 1 ? "s" : ""} · ${n} partidos en juego`;
   overlay.classList.remove("hidden");
+
+  const slugs = [...new Set(items.flatMap(it => [it.homeSlug, it.awaySlug]).filter(Boolean))];
+  Promise.all(slugs.map(loadImg)).then(() => {
+    drawWheel(currentAngle);
+    spinBtn.textContent = "🎰 ¡GIRAR!";
+    spinBtn.disabled = false;
+  });
 }
 
 function launchConfetti() {
