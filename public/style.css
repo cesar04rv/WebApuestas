@@ -1659,9 +1659,9 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
   }
 }
 
-/* ═══════════════════════════════════════════
+/* ═══════════════════════════════════════
    🎰 RULETA DE DESEMPATE
-═══════════════════════════════════════════ */
+═══════════════════════════════════════ */
 .roulette-modal {
   background: #0d1117;
   border: 1px solid #2a2f3a;
@@ -1699,7 +1699,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
   text-align: center;
   min-height: 24px;
   transition: opacity 0.4s;
-  letter-spacing: 0.5px;
 }
 .btn-roulette-spin {
   background: linear-gradient(135deg, #e63946, #f4a261);
@@ -1716,11 +1715,8 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
 }
 .btn-roulette-spin:hover:not(:disabled) { opacity: 0.9; transform: scale(1.02); }
 .btn-roulette-spin:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ═══ CONFETTI ═══ */
 .confetti-container {
-  position: fixed;
-  inset: 0;
+  position: fixed; inset: 0;
   pointer-events: none;
   overflow: hidden;
   z-index: 9999;
@@ -1731,6 +1727,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator { filter: invert
   animation: confettiFall linear forwards;
 }
 @keyframes confettiFall {
-  0%   { transform: translateY(0) rotate(0deg);    opacity: 1; }
+  0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
   100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
 }

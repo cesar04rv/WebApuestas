@@ -1700,7 +1700,7 @@ async function createPoll() {
 // 🗳️ CERRAR VOTACIÓN, RULETA Y CREAR SEMANA
 // =====================================================
 
-let _pollWinner = null; // partido ganador guardado globalmente
+let _pollWinner = null;
 
 async function closePoll() {
   showModal({
@@ -1730,197 +1730,106 @@ function showPollWinnerConfirmation(pollData) {
     toast("Error: no hay datos de votación", "error");
     return;
   }
-
   const options = pollData.options;
   const votes = pollData.votes || [];
-
   const voteCount = {};
-  options.forEach(opt => {
-    voteCount[opt.id] = votes.filter(v => v.option_id === opt.id).length;
-  });
-
+  options.forEach(opt => { voteCount[opt.id] = votes.filter(v => v.option_id === opt.id).length; });
   const maxVotes = Math.max(...options.map(opt => voteCount[opt.id] || 0));
   const tied = options.filter(opt => (voteCount[opt.id] || 0) === maxVotes);
 
   if (tied.length > 1) {
-    // HAY EMPATE → mostrar ruleta
     showRoulette(tied, voteCount);
   } else {
-    // GANADOR CLARO
     const winnerOption = tied[0];
     const homeTeam = teams.find(t => t.id === winnerOption.home_team_id);
     const awayTeam = teams.find(t => t.id === winnerOption.away_team_id);
-    const winnerText = homeTeam && awayTeam
-      ? `<strong>${homeTeam.name}</strong> vs <strong>${awayTeam.name}</strong>`
-      : "Partido seleccionado";
+    const winnerText = homeTeam && awayTeam ? `<strong>${homeTeam.name}</strong> vs <strong>${awayTeam.name}</strong>` : "Partido seleccionado";
     const matchName = homeTeam && awayTeam ? `${homeTeam.name} - ${awayTeam.name}` : "";
-
     showModal({
       icon: "⚽",
       title: "Ganador de la votación",
       body: `<div style="text-align:center;padding:20px"><p style="font-size:14px;color:#999;margin-bottom:10px">El partido con más votos es:</p><p style="font-size:18px;margin:15px 0">${winnerText}</p><p style="font-size:12px;color:#666">Con <strong>${maxVotes}</strong> votos</p></div>`,
       confirmText: "Sí, crear semana",
       danger: false,
-      onConfirm: () => {
-        _pollWinner = { winnerOption, matchName };
-        openCreateWeekPanel(matchName);
-      }
+      onConfirm: () => { _pollWinner = { winnerOption, matchName }; openCreateWeekPanel(matchName); }
     });
   }
 }
 
-// ─── RULETA ────────────────────────────────────────────────────────────────
-
 function showRoulette(tiedOptions, voteCount) {
-  const overlay = document.getElementById("rouletteOverlay");
-  const canvas  = document.getElementById("rouletteCanvas");
-  const spinBtn = document.getElementById("rouletteSpinBtn");
+  const overlay  = document.getElementById("rouletteOverlay");
+  const canvas   = document.getElementById("rouletteCanvas");
+  const spinBtn  = document.getElementById("rouletteSpinBtn");
   const resultEl = document.getElementById("rouletteResult");
-
-  // Enriquecer opciones con nombres
   const items = tiedOptions.map(opt => {
     const home = teams.find(t => t.id === opt.home_team_id);
     const away = teams.find(t => t.id === opt.away_team_id);
-    return {
-      opt,
-      label: home && away ? `${home.name} - ${away.name}` : "Partido",
-      votes: voteCount[opt.id] || 0
-    };
+    return { opt, label: home && away ? `${home.name} - ${away.name}` : "Partido", votes: voteCount[opt.id] || 0 };
   });
-
   const n = items.length;
   const COLORS = ["#e63946","#f4a261","#2a9d8f","#457b9d","#e9c46a","#6d4c9f","#f77f00","#23967f"];
   const sliceAngle = (2 * Math.PI) / n;
-  let currentAngle = 0;
+  let currentAngle = -Math.PI / 2;
   let spinning = false;
-  let winner = null;
-
   const ctx = canvas.getContext("2d");
   const R = canvas.width / 2;
 
   function drawWheel(angle) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     items.forEach((item, i) => {
-      const start = angle + i * sliceAngle;
-      const end   = start + sliceAngle;
-      const color = COLORS[i % COLORS.length];
-
-      // Sector
-      ctx.beginPath();
-      ctx.moveTo(R, R);
-      ctx.arc(R, R, R - 4, start, end);
-      ctx.closePath();
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.strokeStyle = "#0d1117";
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      // Texto
-      ctx.save();
-      ctx.translate(R, R);
-      ctx.rotate(start + sliceAngle / 2);
-      ctx.textAlign = "right";
-      ctx.fillStyle = "#fff";
+      const start = angle + i * sliceAngle, end = start + sliceAngle;
+      ctx.beginPath(); ctx.moveTo(R, R); ctx.arc(R, R, R - 4, start, end); ctx.closePath();
+      ctx.fillStyle = COLORS[i % COLORS.length]; ctx.fill();
+      ctx.strokeStyle = "#0d1117"; ctx.lineWidth = 3; ctx.stroke();
+      ctx.save(); ctx.translate(R, R); ctx.rotate(start + sliceAngle / 2);
+      ctx.textAlign = "right"; ctx.fillStyle = "#fff";
       ctx.font = `bold ${Math.min(13, 160 / n)}px Barlow Condensed, sans-serif`;
-      ctx.shadowColor = "rgba(0,0,0,0.6)";
-      ctx.shadowBlur = 4;
-      // Split label to two lines if long
-      const words = item.label.split(" - ");
-      if (words.length === 2) {
-        ctx.fillText(words[0], R - 18, -6);
-        ctx.fillText(words[1], R - 18, 10);
-      } else {
-        ctx.fillText(item.label, R - 18, 4);
-      }
+      ctx.shadowColor = "rgba(0,0,0,0.6)"; ctx.shadowBlur = 4;
+      const parts = item.label.split(" - ");
+      if (parts.length === 2) { ctx.fillText(parts[0], R - 18, -6); ctx.fillText(parts[1], R - 18, 10); }
+      else { ctx.fillText(item.label, R - 18, 4); }
       ctx.restore();
     });
-
-    // Centro
-    ctx.beginPath();
-    ctx.arc(R, R, 22, 0, 2 * Math.PI);
-    ctx.fillStyle = "#0d1117";
-    ctx.fill();
-    ctx.strokeStyle = "#fff";
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Puntero (triángulo arriba)
-    ctx.beginPath();
-    ctx.moveTo(R - 14, 4);
-    ctx.lineTo(R + 14, 4);
-    ctx.lineTo(R, 36);
-    ctx.closePath();
-    ctx.fillStyle = "#fff";
-    ctx.shadowColor = "rgba(0,0,0,0.8)";
-    ctx.shadowBlur = 6;
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    ctx.beginPath(); ctx.arc(R, R, 22, 0, 2 * Math.PI);
+    ctx.fillStyle = "#0d1117"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(R - 14, 4); ctx.lineTo(R + 14, 4); ctx.lineTo(R, 36); ctx.closePath();
+    ctx.fillStyle = "#fff"; ctx.shadowColor = "rgba(0,0,0,0.8)"; ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0;
   }
 
   function spin() {
     if (spinning) return;
-    spinning = true;
-    spinBtn.disabled = true;
-    resultEl.style.opacity = "0";
-
-    const totalRotation = (6 + Math.random() * 8) * 2 * Math.PI; // 6-14 vueltas
-    const duration = 4000 + Math.random() * 2000; // 4-6 segundos
-    const start = performance.now();
-    const startAngle = currentAngle;
-
-    function easeOut(t) {
-      return 1 - Math.pow(1 - t, 4); // quartic ease-out
-    }
-
+    spinning = true; spinBtn.disabled = true; resultEl.style.opacity = "0";
+    const totalRotation = (6 + Math.random() * 8) * 2 * Math.PI;
+    const duration = 4000 + Math.random() * 2000;
+    const start = performance.now(), startAngle = currentAngle;
+    function easeOut(t) { return 1 - Math.pow(1 - t, 4); }
     function frame(now) {
-      const elapsed = now - start;
-      const t = Math.min(elapsed / duration, 1);
+      const t = Math.min((now - start) / duration, 1);
       currentAngle = startAngle + totalRotation * easeOut(t);
       drawWheel(currentAngle);
-
-      if (t < 1) {
-        requestAnimationFrame(frame);
-      } else {
-        // Calcular ganador: el puntero está arriba (ángulo -π/2 relativo al centro)
-        const normalized = (((-currentAngle - Math.PI / 2) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-        const winIdx = Math.floor(normalized / sliceAngle) % n;
-        winner = items[winIdx];
-        spinning = false;
-        showRouletteWinner(winner);
-      }
+      if (t < 1) { requestAnimationFrame(frame); return; }
+      spinning = false;
+      const normalized = (((-currentAngle - Math.PI / 2) % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+      const winner = items[Math.floor(normalized / sliceAngle) % n];
+      resultEl.innerHTML = `🎉 <strong>${winner.label}</strong>`;
+      resultEl.style.opacity = "1";
+      spinBtn.textContent = "✅ Elegir este partido";
+      spinBtn.disabled = false;
+      spinBtn.onclick = () => {
+        overlay.classList.add("hidden");
+        _pollWinner = { winnerOption: winner.opt, matchName: winner.label };
+        openCreateWeekPanel(winner.label);
+      };
+      launchConfetti();
     }
-
     requestAnimationFrame(frame);
   }
 
-  function showRouletteWinner(w) {
-    resultEl.innerHTML = `🎉 <strong>${w.label}</strong>`;
-    resultEl.style.opacity = "1";
-    spinBtn.textContent = "✅ Elegir este partido";
-    spinBtn.disabled = false;
-    spinBtn.onclick = () => {
-      overlay.classList.add("hidden");
-      _pollWinner = { winnerOption: w.opt, matchName: w.label };
-      openCreateWeekPanel(w.label);
-    };
-    launchConfetti();
-  }
-
-  // Reset estado
-  winner = null;
-  resultEl.style.opacity = "0";
-  resultEl.innerHTML = "";
-  spinBtn.textContent = "🎰 ¡GIRAR!";
-  spinBtn.disabled = false;
-  spinBtn.onclick = spin;
-  currentAngle = -Math.PI / 2; // puntero arriba
+  resultEl.style.opacity = "0"; resultEl.innerHTML = "";
+  spinBtn.textContent = "🎰 ¡GIRAR!"; spinBtn.disabled = false; spinBtn.onclick = spin;
   drawWheel(currentAngle);
-
-  // Subtítulo con partidos empatados
   document.getElementById("rouletteTied").textContent =
     `Empate a ${items[0].votes} voto${items[0].votes !== 1 ? "s" : ""} · ${n} partidos en juego`;
-
   overlay.classList.remove("hidden");
 }
 
@@ -1931,21 +1840,11 @@ function launchConfetti() {
   for (let i = 0; i < 80; i++) {
     const el = document.createElement("div");
     el.className = "confetti-piece";
-    el.style.cssText = `
-      left:${Math.random()*100}%;
-      background:${colors[Math.floor(Math.random()*colors.length)]};
-      width:${6+Math.random()*8}px;
-      height:${6+Math.random()*8}px;
-      animation-delay:${Math.random()*0.5}s;
-      animation-duration:${1.2+Math.random()*1}s;
-      border-radius:${Math.random()>0.5?"50%":"2px"};
-    `;
+    el.style.cssText = `left:${Math.random()*100}%;background:${colors[Math.floor(Math.random()*colors.length)]};width:${6+Math.random()*8}px;height:${6+Math.random()*8}px;animation-delay:${Math.random()*0.5}s;animation-duration:${1.2+Math.random()}s;border-radius:${Math.random()>0.5?"50%":"2px"};`;
     container.appendChild(el);
   }
   setTimeout(() => { container.innerHTML = ""; }, 3000);
 }
-
-// ─── PANEL FIJO: CREAR SEMANA ──────────────────────────────────────────────
 
 function openCreateWeekPanel(matchName) {
   document.getElementById("cwpMatchName").textContent = matchName;
@@ -1957,10 +1856,8 @@ function openCreateWeekPanel(matchName) {
 async function submitCreateWeekFromPoll() {
   const round = (document.getElementById("cwpRound").value || "").trim();
   const matchDate = document.getElementById("cwpDate").value || "";
-
   if (!round) { toast("Indica la jornada", "error"); return; }
   if (!_pollWinner) { toast("Error: no hay partido seleccionado", "error"); return; }
-
   const { winnerOption, matchName } = _pollWinner;
   try {
     const data = await post("/api/create-week-from-poll", {
@@ -1970,15 +1867,54 @@ async function submitCreateWeekFromPoll() {
       match_name: matchName || null,
       match_date: matchDate || null
     });
-    if (data.error) {
-      toast(data.error, "error");
-    } else {
+    if (data.error) { toast(data.error, "error"); }
+    else {
       document.getElementById("createWeekPollOverlay").classList.add("hidden");
       _pollWinner = null;
       toast("✓ Semana creada desde votación", "success");
       loadData();
     }
-  } catch (err) {
-    toast("Error: " + err.message, "error");
+  } catch (err) { toast("Error: " + err.message, "error"); }
+}
+
+function renderAdminPoll() {
+  const container = document.getElementById("currentPollAdmin");
+  const btn = document.getElementById("closePollBtn");
+  
+  if (!currentPoll || !currentPoll.active) {
+    container.innerHTML = '<p class="empty-state" style="padding:12px 0;font-size:13px">No hay votación activa</p>';
+    btn.style.display = "none";
+    return;
   }
+  
+  btn.style.display = "block";
+  
+  const totalVotes = currentPoll.votes.length;
+  const activePlayers = players.filter(p => p.active).length;
+  
+  let html = `
+    <div style="margin-bottom:10px">
+      <strong>${currentPoll.poll.title}</strong><br>
+      <span style="font-size:12px;color:var(--text-muted)">${totalVotes} de ${activePlayers} jugadores han votado</span>
+    </div>
+  `;
+  
+  pollOptions.forEach(opt => {
+    const percentage = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
+    html += `
+      <div style="margin-bottom:8px;padding:8px;background:var(--bg);border:1px solid var(--border);border-radius:6px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          ${teamBadge(opt.home_team_slug, 20)}
+          <span style="font-size:12px">${opt.home_team_name} vs ${opt.away_team_name}</span>
+          ${teamBadge(opt.away_team_slug, 20)}
+        </div>
+        <div style="background:rgba(255,255,255,0.05);height:6px;border-radius:3px;overflow:hidden">
+          <div style="background:var(--green);height:100%;width:${percentage}%"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:2px">${opt.votes} votos (${percentage}%)</div>
+      </div>
+    `;
+  });
+  
+  container.innerHTML = html;
 }
