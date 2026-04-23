@@ -1343,7 +1343,7 @@ app.post("/delete-team", async (req, res) => {
   }
 });
 
-// ===================== START =====================
+// ===================== START ====================
 initDB().then(() => {
   app.listen(PORT, () => {
     console.log(`✅ Servidor en http://localhost:${PORT}`);
