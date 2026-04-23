@@ -210,34 +210,7 @@ async function initDB() {
   
   await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS home_team_id INTEGER`);
   await pool.query(`ALTER TABLE weeks ADD COLUMN IF NOT EXISTS away_team_id INTEGER`);
-
-  // 🗳️ Tablas de votación
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS match_polls (
-      id SERIAL PRIMARY KEY,
-      title TEXT,
-      active BOOLEAN DEFAULT true,
-      created_at TIMESTAMPTZ DEFAULT NOW()
-    )
-  `);
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS poll_options (
-      id SERIAL PRIMARY KEY,
-      poll_id INTEGER REFERENCES match_polls(id) ON DELETE CASCADE,
-      home_team_id INTEGER REFERENCES teams(id),
-      away_team_id INTEGER REFERENCES teams(id)
-    )
-  `);
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS poll_votes (
-      id SERIAL PRIMARY KEY,
-      poll_id INTEGER REFERENCES match_polls(id) ON DELETE CASCADE,
-      option_id INTEGER REFERENCES poll_options(id) ON DELETE CASCADE,
-      player_id INTEGER,
-      UNIQUE(poll_id, player_id)
-    )
-  `);
-
+  
   console.log("✅ Base de datos lista");
 }
 
@@ -985,6 +958,9 @@ app.post("/api/import", async (req, res) => {
   try {
     await pool.query("DELETE FROM predictions");
     await pool.query("DELETE FROM payments").catch(() => {});
+    await pool.query("DELETE FROM poll_votes").catch(() => {});
+    await pool.query("DELETE FROM poll_options").catch(() => {});
+    await pool.query("DELETE FROM match_polls").catch(() => {});
     await pool.query("DELETE FROM weeks");
     await pool.query("DELETE FROM players");
     await pool.query("DELETE FROM teams");
@@ -1044,6 +1020,9 @@ app.post("/api/reset", async (req, res) => {
   try {
     await pool.query("DELETE FROM predictions");
     await pool.query("DELETE FROM payments").catch(() => {});
+    await pool.query("DELETE FROM poll_votes").catch(() => {});
+    await pool.query("DELETE FROM poll_options").catch(() => {});
+    await pool.query("DELETE FROM match_polls").catch(() => {});
     await pool.query("DELETE FROM weeks");
     await pool.query("DELETE FROM players");
     await pool.query("DELETE FROM teams");
@@ -1133,14 +1112,9 @@ app.post("/api/create-poll", async (req, res) => {
   }
   
   try {
-    // 1. Eliminar votaciones cerradas antiguas (con sus opciones y votos)
-    const { rows: oldPolls } = await pool.query("SELECT id FROM match_polls WHERE active = false");
-    for (const p of oldPolls) {
-      await pool.query("DELETE FROM poll_votes WHERE poll_id = $1", [p.id]);
-      await pool.query("DELETE FROM poll_options WHERE poll_id = $1", [p.id]);
-    }
+    // 1. Eliminar votaciones cerradas antiguas
     await pool.query("DELETE FROM match_polls WHERE active = false");
-
+    
     // 2. Cerrar votación activa actual
     await pool.query("UPDATE match_polls SET active = false WHERE active = true");
     
