@@ -953,14 +953,14 @@ app.get("/api/export", async (req, res) => {
 });
 
 app.post("/api/import", async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
   const { players, weeks, predictions, teams, payments } = req.body;
   if (!players || !weeks || !predictions) return res.status(400).json({ error: "JSON inválido: faltan datos" });
   try {
     await pool.query("DELETE FROM predictions");
     await pool.query("DELETE FROM payments").catch(() => {});
-    await pool.query("DELETE FROM poll_votes").catch(() => {});
-    await pool.query("DELETE FROM poll_options").catch(() => {});
-    await pool.query("DELETE FROM match_polls").catch(() => {});
     await pool.query("DELETE FROM weeks");
     await pool.query("DELETE FROM players");
     await pool.query("DELETE FROM teams");
@@ -1017,12 +1017,12 @@ app.post("/api/import", async (req, res) => {
 });
 
 app.post("/api/reset", async (req, res) => {
+  if (!req.session.user || req.session.user.role !== 'admin') {
+    return res.status(403).json({ error: "Solo administradores pueden hacer esto" });
+  }
   try {
     await pool.query("DELETE FROM predictions");
     await pool.query("DELETE FROM payments").catch(() => {});
-    await pool.query("DELETE FROM poll_votes").catch(() => {});
-    await pool.query("DELETE FROM poll_options").catch(() => {});
-    await pool.query("DELETE FROM match_polls").catch(() => {});
     await pool.query("DELETE FROM weeks");
     await pool.query("DELETE FROM players");
     await pool.query("DELETE FROM teams");
