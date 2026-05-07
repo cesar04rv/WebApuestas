@@ -6,7 +6,7 @@ const bodyParser = require("body-parser");
 const session = require("express-session");
 
 // =====================================================
-// 📧 SERVICIO DE EMAILS CON MAILGUN
+//  SERVICIO DE EMAILS CON MAILGUN
 // =====================================================
 const {
   initMailgun,
@@ -15,7 +15,7 @@ const {
 } = require("./mailgun-service");
 
 // =====================================================
-// 🔥 FIREBASE ADMIN SDK (RENDER SECRET FILES - MEJORADO)
+//  FIREBASE ADMIN SDK (RENDER SECRET FILES - MEJORADO)
 // =====================================================
 const admin = require("firebase-admin");
 const fs = require("fs");
@@ -505,11 +505,36 @@ app.post("/new-week", async (req, res) => {
     const pot = rows[0]?.next_pot || 0;
     const now = new Date().toLocaleString("es-ES", { timeZone: "Europe/Madrid" });
     const excludedStr = Array.isArray(excluded_players) ? excluded_players.join(",") : (excluded_players || "");
-    await pool.query(
-      "INSERT INTO weeks (match, match_date, created_at, pot, finished, round_number, excluded_players, home_team_id, away_team_id) VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8)",
+    const { rows: newWeekRows } = await pool.query(
+      "INSERT INTO weeks (match, match_date, created_at, pot, finished, round_number, excluded_players, home_team_id, away_team_id) VALUES ($1, $2, $3, $4, 0, $5, $6, $7, $8) RETURNING *",
       [match.trim(), match_date || null, now, pot, round_number || null, excludedStr, home_team_id || null, away_team_id || null]
     );
     res.json({ success: true });
+
+    // 📧 Enviar email al primer jugador
+    try {
+      const week = newWeekRows[0];
+      const excludedIds = excludedStr ? excludedStr.split(",").filter(Boolean).map(Number) : [];
+      const { rows: activePlayers } = await pool.query(
+        "SELECT * FROM players WHERE active = 1 AND id != ALL($1) ORDER BY order_position ASC",
+        [excludedIds.length ? excludedIds : [0]]
+      );
+      if (activePlayers.length > 0) {
+        const firstPlayer = activePlayers[0];
+        const homeTeamName = home_team_id
+          ? (await pool.query("SELECT name FROM teams WHERE id = $1", [home_team_id])).rows[0]?.name || "Local"
+          : "Local";
+        const awayTeamName = away_team_id
+          ? (await pool.query("SELECT name FROM teams WHERE id = $1", [away_team_id])).rows[0]?.name || "Visitante"
+          : "Visitante";
+        const matchInfo = match.trim() || `${homeTeamName} vs ${awayTeamName}`;
+        sendTurnToPlayer(pool, firstPlayer.id, matchInfo, homeTeamName, awayTeamName)
+          .then(ok => console.log(ok ? `📧 Email enviado a ${firstPlayer.name}` : `⚠️ Email no enviado a ${firstPlayer.name}`))
+          .catch(err => console.error("❌ Error email primer jugador:", err.message));
+      }
+    } catch (err) {
+      console.error("❌ Error buscando primer jugador:", err.message);
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1272,6 +1297,25 @@ app.post("/api/create-week-from-poll", async (req, res) => {
 
     console.log("✅ Semana creada:", newWeek[0]);
     res.json({ success: true, message: "Semana creada desde votación", week: newWeek[0] });
+
+    // 📧 Enviar email al primer jugador
+    try {
+      const week = newWeek[0];
+      const { rows: activePlayers } = await pool.query(
+        "SELECT * FROM players WHERE active = 1 ORDER BY order_position ASC"
+      );
+      if (activePlayers.length > 0) {
+        const firstPlayer = activePlayers[0];
+        const homeTeamName = (await pool.query("SELECT name FROM teams WHERE id = $1", [home_team_id])).rows[0]?.name || "Local";
+        const awayTeamName = (await pool.query("SELECT name FROM teams WHERE id = $1", [away_team_id])).rows[0]?.name || "Visitante";
+        const matchInfo = match_name || `${homeTeamName} vs ${awayTeamName}`;
+        sendTurnToPlayer(pool, firstPlayer.id, matchInfo, homeTeamName, awayTeamName)
+          .then(ok => console.log(ok ? `📧 Email enviado a ${firstPlayer.name}` : `⚠️ Email no enviado a ${firstPlayer.name}`))
+          .catch(err => console.error("❌ Error email primer jugador:", err.message));
+      }
+    } catch (err) {
+      console.error("❌ Error buscando primer jugador:", err.message);
+    }
   } catch (err) {
     console.error("❌ Error al crear semana:", err);
     res.status(500).json({ error: err.message });
