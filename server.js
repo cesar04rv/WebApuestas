@@ -90,7 +90,6 @@ try {
   console.error("   3. Asegúrate de que el JSON esté EN UNA SOLA LÍNEA");
   console.error("   4. O formateado correctamente con todos los campos");
   console.error("");
-  
   throw err;
 }
 // =====================================================
@@ -123,12 +122,12 @@ app.use(session({
 app.use((req, res, next) => {
   // Rutas públicas que NO requieren autenticación
   const openPaths = [
-    "/api/firebase-login",      // ← NUEVO: Login con Firebase
-    "/api/firebase-register",   // ← NUEVO: Registro con Firebase
-    "/api/check-email",          // ← NUEVO: Verificar si email está autorizado
+    "/api/firebase-login",      
+    "/api/firebase-register",   
+    "/api/check-email",          
     "/api/me",
     "/login.html",
-    "/firebase-config.js"        // ← NUEVO: Config de Firebase para frontend
+    "/firebase-config.js"        
   ];
   
   const openExtensions = [".png", ".jpg", ".jpeg", ".ico", ".svg", ".webp", ".css", ".js", ".woff", ".woff2"];
